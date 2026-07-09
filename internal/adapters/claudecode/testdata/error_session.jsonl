@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","cwd":"/ws","session_id":"sess-err1","tools":["Bash"],"model":"claude-sonnet-4-6"}
+{"type":"result","subtype":"error_during_execution","is_error":true,"duration_ms":1200,"num_turns":1,"result":"Credit balance is too low","session_id":"sess-err1","total_cost_usd":0}

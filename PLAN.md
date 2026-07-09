@@ -36,12 +36,14 @@ in a compiling state**.
   creates/continues conversations (`-conv`, `-conversations`, `-data`).
   Tests round-trip conversations, the turn lifecycle, and an engine run.
 
-- [ ] **Step 3 — Claude Code adapter.** `internal/adapters/claudecode`.
-  Non-interactive invocation: `claude -p --output-format stream-json
-  --verbose` (plus `--model`, `--resume <session>` when continuing).
-  Parse the stream-json events into the normalized schema. **Do not call
-  the real binary in unit tests** — use recorded fixture streams under
-  `testdata/`. Detect availability via `exec.LookPath("claude")`.
+- [x] **Step 3 — Claude Code adapter.** `internal/adapters/claudecode`.
+  Non-interactive: `claude -p --output-format stream-json --verbose
+  [--model] [--resume] --permission-mode acceptEdits -- <prompt>`.
+  Parser (stream.go) is separate from process execution and covered by
+  fixtures in `testdata/` (success, error, garbage-line tolerance);
+  RunTurn is covered via a stub shell script standing in for the binary.
+  Registered in the CLI harness. Flags still need one verification pass
+  against a live install — see docs/adapters.md.
 
 - [ ] **Step 4 — Codex adapter.** `internal/adapters/codex`. Non-interactive:
   `codex exec --json` (verify current flags against `codex exec --help` at
