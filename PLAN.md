@@ -27,12 +27,14 @@ in a compiling state**.
   harness (`cmd/agentchat-cli`) so the engine is runnable before any GUI
   exists. Stdlib only. Unit tests for event schema + registry + echo turn.
 
-- [ ] **Step 2 — Turn engine & transcript store.** `internal/transcript`:
-  conversation/turn/event persistence. Start with JSON-lines files under a
-  data dir (`~/.agentchat` or `AGENTCHAT_DATA`); design the store as an
-  interface so SQLite can replace it later. A `Turn` records: client, model,
-  workspace ref, prompt, events, result (usage/cost/exit), start/end times.
-  Wire the CLI harness to persist turns. Tests: round-trip a conversation.
+- [x] **Step 2 — Turn engine & transcript store.** `internal/transcript`:
+  `Store` interface + `FSStore` (JSON + JSONL under `-data`, `$AGENTCHAT_DATA`,
+  or `~/.agentchat`; layout: `conversations/<id>/conversation.json` +
+  `turns/<seq>-<id>/{turn.json,events.jsonl}`), designed so SQLite can
+  replace it later. `internal/engine`: composes registry + store, persists
+  events as they stream, records result/error on the turn. CLI harness now
+  creates/continues conversations (`-conv`, `-conversations`, `-data`).
+  Tests round-trip conversations, the turn lifecycle, and an engine run.
 
 - [ ] **Step 3 — Claude Code adapter.** `internal/adapters/claudecode`.
   Non-interactive invocation: `claude -p --output-format stream-json

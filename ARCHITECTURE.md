@@ -80,7 +80,8 @@ internal/adapters/
   codex/               Step 4
   aider/               Step 5
   swival/              Step 6
-internal/transcript/   Step 2: conversation/turn persistence
+internal/transcript/   Store iface + FSStore: conversations, turns, event logs
+internal/engine/       runs a turn via an adapter and persists it to the store
 internal/workspace/    Step 7: repo/worktree/scratch + per-turn snapshots
 internal/artifact/     Step 8: artifact library
 frontend/              Step 10: Wails frontend (does not exist yet)
