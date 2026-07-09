@@ -54,10 +54,28 @@ and update this file in the same commit.
   the adapter reports the new session_id, so the transcript stays
   correct, but continuity is lost.
 
-## aider — Step 5 ⚠ planned
-    aider --message "<prompt>" --yes-always --no-stream [--model <id>]
-- Output is line-oriented text, not JSON. Aider auto-commits; derive
-  file_change events from `git diff --name-status <before>..<after>`.
+## aider — Step 5 ✅ implemented (⚠ flags unverified against a live install)
+    aider --message "<prompt>" --yes-always --no-stream --no-pretty \
+        [--model <id>] [--restore-chat-history]
+- Output is line-oriented text. Parsing is heuristic: prose (including
+  SEARCH/REPLACE edit blocks) → grouped text events; "Applied edit to
+  <path>" → file_change; "Commit <hash> <msg>" → git-commit tool_result;
+  the "Tokens: Xk sent, Yk received. Cost: $Z message" line → usage.
+  Banner/housekeeping lines (Aider v…, Main model:, Repo-map:, Added …,
+  etc. — see noisePrefixes in output.go) are suppressed.
+- Authoritative file changes come from git, not the text: HEAD is read
+  before and after the run and `git diff --name-status -M before after`
+  wins when aider committed (its default). Outside a repo, or when
+  nothing was committed, the Applied-edit lines are the fallback.
+- No session IDs: continuity comes from aider's own history files in the
+  workspace (.aider.chat.history.md). SessionID is ignored;
+  Extra["restore_chat_history"]="true" adds --restore-chat-history.
+- API keys/base URLs (incl. OpenAI-compatible servers like LocalAI) pass
+  through the environment (OPENAI_API_KEY, OPENAI_API_BASE,
+  ANTHROPIC_API_KEY, ...) via TurnRequest.Env — Step 11 wires config.
+- TODO when a live `aider` is available: verify flags with `aider
+  --help`, record the version, and sanity-check the noise-prefix list
+  against real output (it varies slightly across versions).
 
 ## swival — Step 6 ⚠ planned
 - Check https://swival.dev/ docs for the non-interactive/print mode and

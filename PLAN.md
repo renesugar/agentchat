@@ -54,11 +54,15 @@ in a compiling state**.
   Fixture + stub-binary tests as in Step 3. Resume-flag caveats recorded
   in docs/adapters.md pending one pass against a live install.
 
-- [ ] **Step 5 — Aider adapter.** `internal/adapters/aider`. Non-interactive:
-  `aider --message <prompt> --yes-always --no-stream` plus `--model`.
-  Aider's output is line-oriented text + git commits, not JSON: emit
-  `text` events for output and synthesize `file_change` events from the
-  git diff of the commit(s) aider makes. Fixture tests.
+- [x] **Step 5 — Aider adapter.** `internal/adapters/aider`. Non-interactive:
+  `aider --message <prompt> --yes-always --no-stream --no-pretty
+  [--model] [--restore-chat-history]`. Heuristic line parser (prose →
+  text events, Applied-edit → file_change, Commit → tool_result,
+  Tokens/Cost → usage; banner noise suppressed). Authoritative file
+  changes derived from `git diff --name-status` of HEAD before/after,
+  with Applied-edit fallback outside a repo. Fixture test plus
+  stub-binary tests against a real temp git repo. No session IDs —
+  continuity via aider's history files (see docs/adapters.md).
 
 - [ ] **Step 6 — Swival adapter.** `internal/adapters/swival`. Check
   swival's non-interactive/print mode and model flags from its docs/help

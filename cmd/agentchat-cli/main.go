@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/example/agentchat/internal/adapter"
+	"github.com/example/agentchat/internal/adapters/aider"
 	"github.com/example/agentchat/internal/adapters/claudecode"
 	"github.com/example/agentchat/internal/adapters/codex"
 	"github.com/example/agentchat/internal/adapters/echo"
@@ -58,7 +59,8 @@ func run() error {
 	reg.Register(echo.New())
 	reg.Register(claudecode.New())
 	reg.Register(codex.New())
-	// Remaining adapters are registered here as PLAN.md Steps 5-6 land.
+	reg.Register(aider.New())
+	// The swival adapter is registered here when PLAN.md Step 6 lands.
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
