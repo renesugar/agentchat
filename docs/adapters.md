@@ -25,10 +25,34 @@ and update this file in the same commit.
   `claude --help` and record the version here; capture a fresh fixture if
   the stream format drifted (fixtures: `internal/adapters/claudecode/testdata/`).
 
-## codex (Codex CLI) — Step 4 ⚠ planned
-    codex exec [--json] [--model <id>] "<prompt>"
-- Verify flag names for JSON output, model selection, sandbox/approval
-  settings, and session resume; pin here with `codex --version`.
+## codex (Codex CLI) — Step 4 ✅ implemented (verified against docs/web, not a live install)
+    codex exec --json --sandbox workspace-write --skip-git-repo-check \
+        [--model <id>] [resume <thread_id>] -
+- Prompt is piped to stdin (the trailing `-`), avoiding quoting issues.
+- JSONL events handled: `thread.started`/`thread.resumed` (thread_id →
+  session for resume), `turn.started`, `turn.completed` (usage: input +
+  cached_input → InputTokens, output → OutputTokens), `turn.failed`
+  (error.message), top-level `error` ("Reconnecting... X/Y" notices are
+  treated as non-fatal progress), and `item.started/updated/completed`
+  for item types: agent_message (last one = final text), reasoning,
+  command_execution (tool_use on start, tool_result with
+  aggregated_output/exit_code on completion), file_change
+  (changes[].kind add/update/delete → created/modified/deleted; skipped
+  from the aggregate when status=failed), mcp_tool_call, web_search,
+  todo_list (rendered as a checklist plan event), error. Both `type` and
+  the legacy `item_type` key are accepted.
+- `--skip-git-repo-check` is on by default because the engine controls
+  workspaces (disable per turn via Extra["skip_git_repo_check"]="false").
+- Sandbox defaults to workspace-write; override via Extra["sandbox"]
+  (read-only | workspace-write | danger-full-access; "" omits the flag).
+- ⚠ resume caveat: some codex versions reject --json/--model/--sandbox
+  when resuming; flag placement here (before the `resume` subcommand)
+  matches current documented behavior. On a live install run
+  `codex exec --help` and one resume turn to confirm; record the
+  `codex --version` here. Also note: resuming an `--ephemeral` or
+  missing session silently starts a NEW session (thread_id changes) —
+  the adapter reports the new session_id, so the transcript stays
+  correct, but continuity is lost.
 
 ## aider — Step 5 ⚠ planned
     aider --message "<prompt>" --yes-always --no-stream [--model <id>]

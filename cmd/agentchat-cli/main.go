@@ -25,6 +25,7 @@ import (
 
 	"github.com/example/agentchat/internal/adapter"
 	"github.com/example/agentchat/internal/adapters/claudecode"
+	"github.com/example/agentchat/internal/adapters/codex"
 	"github.com/example/agentchat/internal/adapters/echo"
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/transcript"
@@ -56,7 +57,8 @@ func run() error {
 	reg := adapter.NewRegistry()
 	reg.Register(echo.New())
 	reg.Register(claudecode.New())
-	// Remaining adapters are registered here as PLAN.md Steps 4-6 land.
+	reg.Register(codex.New())
+	// Remaining adapters are registered here as PLAN.md Steps 5-6 land.
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

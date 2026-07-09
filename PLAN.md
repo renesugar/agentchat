@@ -45,10 +45,14 @@ in a compiling state**.
   Registered in the CLI harness. Flags still need one verification pass
   against a live install — see docs/adapters.md.
 
-- [ ] **Step 4 — Codex adapter.** `internal/adapters/codex`. Non-interactive:
-  `codex exec --json` (verify current flags against `codex exec --help` at
-  implementation time; pin what you find in `docs/adapters.md`). Fixture
-  tests as in Step 3.
+- [x] **Step 4 — Codex adapter.** `internal/adapters/codex`. Non-interactive:
+  `codex exec --json --sandbox workspace-write --skip-git-repo-check
+  [--model] [resume <thread_id>] -` with the prompt on stdin. Parser
+  covers thread/turn/item JSONL events (agent_message, reasoning,
+  command_execution, file_change, mcp_tool_call, web_search, todo_list,
+  error; reconnect notices non-fatal; legacy item_type key accepted).
+  Fixture + stub-binary tests as in Step 3. Resume-flag caveats recorded
+  in docs/adapters.md pending one pass against a live install.
 
 - [ ] **Step 5 — Aider adapter.** `internal/adapters/aider`. Non-interactive:
   `aider --message <prompt> --yes-always --no-stream` plus `--model`.
