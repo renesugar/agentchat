@@ -88,10 +88,16 @@ in a compiling state**.
   creates a managed workspace; a git repo at -dir is auto-managed;
   snapshot hash printed per turn.
 
-- [ ] **Step 8 — Artifact library.** `internal/artifact`. Content-addressed
-  store under the data dir for user uploads and client outputs. Large-repo
-  policy: store a *link* record (local path + optional remote URL) instead
-  of copying; ZIP snapshots reference turns. Tests.
+- [x] **Step 8 — Artifact library.** `internal/artifact`. Content-addressed
+  store (SHA-256 CAS: `cas/<aa>/<hash>`, one JSON record per artifact in
+  `index/`): AddFile streams + hashes + dedupes blobs across records,
+  AddLink stores large-repo references (local path + optional remote URL
+  as archival fallback; dangling links surface the fallback on Open),
+  Get/Open/BlobPath/List (newest-first, filter by conversation), Delete
+  with blob GC when the last referencing record goes. Provenance fields:
+  conversation, turn, origin, note. Consumed by Step 9 (export) and the
+  Step 10 GUI artifact panel. Tests: round-trip, dedupe + GC, links,
+  list filtering.
 
 - [ ] **Step 9 — Export.** Markdown transcript of a whole conversation
   (prompt/response per turn, file-change summaries, per-turn tree hashes)
