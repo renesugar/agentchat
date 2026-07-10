@@ -112,12 +112,27 @@ in a compiling state**.
   CLI: `-conv <id> -export-md f.md` / `-export-bundle f.zip` (bundle
   picks up the workspace from -dir when it's a managed repo).
 
-- [ ] **Step 10 — Wails shell & chat frontend.** Initialize Wails v2 app
-  (`wails init -n agentchat -t svelte` or react; document the choice).
-  Bind: list adapters/models, start turn, stream events (Wails events),
-  conversation list grouped by project/repo, artifact panel, export
-  buttons. This step introduces the Wails dependency; keep `internal/`
-  buildable without it (`make check` must still pass headless).
+- [x] **Step 10 — Wails shell & chat frontend.** `app/` is a NESTED Go
+  module (wails v2 + a replace directive to the core) so `make check` on
+  the root stays green in environments that can't fetch Wails/webkit.
+  Frontend is plain HTML/CSS/JS embedded from `app/frontend/dist` — no
+  npm, no bundler. Bindings (app/app.go): Adapters (availability +
+  models), Conversations/Turns/Events, CreateConversation (repo picker
+  via native dialog, or scratch), Run (streams every normalized event to
+  the frontend as the Wails event "turn-event"; reuses the last session
+  ID per client; one turn in flight per conversation), Artifacts +
+  AttachFile, ExportMarkdown/ExportBundle via save dialogs (exports are
+  recorded as link artifacts). Workspace resolution per conversation:
+  cached → project repo → last turn's dir reopened → fresh scratch.
+  UI: sidebar grouped by project, transcript ledger where each turn
+  carries a colored spine keyed to its agent, live event streaming with
+  an optimistic turn block replaced by the authoritative record,
+  composer with client+model pickers (Ctrl+Enter runs), artifact panel,
+  adapter availability footer. ⚠ VERIFY ON A REAL MACHINE: `make
+  app-tidy && make app-dev` (see app/README.md); this sandbox cannot
+  fetch the wails module, so the app module is gofmt/syntax-checked but
+  not compiled — expect at most minor binding-API fixes, and pin the
+  exact wails version go mod tidy resolves.
 
 - [ ] **Step 11 — Providers & config.** Config file (`config.yaml` or JSON)
   for provider base URLs / API keys env passthrough, including

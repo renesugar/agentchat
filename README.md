@@ -16,5 +16,13 @@ Status: scaffold. See `PLAN.md` (roadmap + step status), `ARCHITECTURE.md`
     make check      # fmt + vet + test
     make run-echo   # run one turn with the fake adapter
 
-The Wails GUI arrives in Step 10; until then `cmd/agentchat-cli` exercises
-the whole engine.
+## Desktop app
+
+The Wails GUI lives in `app/` (a nested Go module so the core stays
+dependency-free). On a machine with network access:
+
+    make app-tidy   # fetch wails into app/
+    make app-dev    # live-reload development
+    make app-build  # production binary in app/build/bin/
+
+`cmd/agentchat-cli` exercises the same engine headlessly.

@@ -20,5 +20,15 @@ build:
 run-echo:
 	@tmp=$$(mktemp -d) && $(GO) run ./cmd/agentchat-cli -client echo -dir $$tmp "hello from make" && rm -rf $$tmp
 
+# Wails desktop app (nested module in app/; needs network + wails CLI).
+app-tidy:
+	cd app && $(GO) mod tidy
+
+app-dev: app-tidy
+	cd app && wails dev
+
+app-build: app-tidy
+	cd app && wails build
+
 zip:
-	cd .. && zip -qr agentchat.zip agentchat -x 'agentchat/frontend/node_modules/*' && echo ../agentchat.zip
+	cd .. && zip -qr agentchat.zip agentchat -x 'agentchat/app/build/*' 'agentchat/app/frontend/node_modules/*' && echo ../agentchat.zip

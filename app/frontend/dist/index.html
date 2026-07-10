@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgentChat</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="layout">
+    <aside id="sidebar">
+      <header>
+        <h1>Agent<span>Chat</span></h1>
+        <button id="new-conv" title="Start a conversation">New</button>
+      </header>
+
+      <form id="new-form" hidden>
+        <input id="new-title" placeholder="Conversation title" autocomplete="off" />
+        <div class="row">
+          <input id="new-repo" placeholder="Git repo path (optional)" autocomplete="off" />
+          <button type="button" id="pick-repo" title="Choose a repository">…</button>
+        </div>
+        <div class="row">
+          <button type="submit">Create</button>
+          <button type="button" id="new-cancel" class="ghost">Cancel</button>
+        </div>
+        <p class="hint">Leave the repo blank for a scratch workspace. Every turn is snapshotted either way.</p>
+      </form>
+
+      <nav id="conversations" aria-label="Conversations"></nav>
+
+      <footer id="adapter-status" title="Client availability"></footer>
+    </aside>
+
+    <main id="main">
+      <div id="empty-state">
+        <p class="mark">▌claude ▌codex ▌aider ▌swival</p>
+        <p>Pick a client and a model each turn. They take turns on the same workspace, and every turn is pinned to a snapshot.</p>
+        <p>Start a conversation to begin.</p>
+      </div>
+
+      <section id="conv-view" hidden>
+        <header id="conv-header">
+          <div>
+            <h2 id="conv-title"></h2>
+            <p id="conv-meta"></p>
+          </div>
+          <div class="actions">
+            <button id="show-artifacts" class="ghost">Artifacts</button>
+            <button id="export-md" class="ghost">Save transcript</button>
+            <button id="export-zip" class="ghost">Save bundle</button>
+          </div>
+        </header>
+
+        <div id="transcript" aria-live="polite"></div>
+
+        <div id="artifact-panel" hidden>
+          <header>
+            <h3>Artifacts</h3>
+            <div>
+              <button id="attach-file" class="ghost">Attach file</button>
+              <button id="close-artifacts" class="ghost">Close</button>
+            </div>
+          </header>
+          <ul id="artifact-list"></ul>
+        </div>
+
+        <form id="composer">
+          <div class="picker">
+            <select id="client" aria-label="Coding client"></select>
+            <select id="model" aria-label="Model"></select>
+          </div>
+          <textarea id="prompt" rows="3"
+            placeholder="Describe the next turn's task… (Ctrl+Enter to run)"></textarea>
+          <button id="run" type="submit">Run turn</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" hidden></div>
+  <script src="main.js"></script>
+</body>
+</html>

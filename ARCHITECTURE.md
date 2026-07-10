@@ -62,8 +62,11 @@ point of the app.
 
 8. **Headless-first.** `internal/` never imports Wails. A CLI harness
    (`cmd/agentchat-cli`) exercises the whole engine, which keeps the core
-   testable in CI/sandboxes without a webview, and means the GUI (Step 10)
-   is a thin binding layer.
+   testable in CI/sandboxes without a webview. The GUI lives in `app/`, a
+   nested Go module that depends on the core via a replace directive; it
+   is a thin binding layer (app/app.go) plus an embedded no-build vanilla
+   frontend, and is deliberately outside the root module so `make check`
+   never needs the Wails dependency.
 
 9. **LocalAI's role.** LocalAI (and any OpenAI-compatible server) is a
    *model provider that coding clients point at* via base-URL config — it
@@ -88,6 +91,8 @@ internal/transcript/   Store iface + FSStore: conversations, turns, event logs
 internal/engine/       runs a turn via an adapter and persists it to the store
 internal/workspace/    Step 7: repo/worktree/scratch + per-turn snapshots
 internal/artifact/     Step 8: artifact library
-frontend/              Step 10: Wails frontend (does not exist yet)
+app/                   Wails desktop app — NESTED module (own go.mod with a
+                       replace to the core) so the root stays dependency-free;
+                       vanilla JS frontend embedded from app/frontend/dist
 docs/adapters.md       verified CLI invocations per client
 ```

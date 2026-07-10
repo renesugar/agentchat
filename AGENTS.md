@@ -10,7 +10,10 @@ You are implementing AgentChat according to `PLAN.md`. Rules:
 3. **Update `PLAN.md`** (`[ ]` → `[x]`) and commit with message
    `step N: <summary>` when done.
 4. **Keep `internal/` free of GUI/framework imports.** Wails code lives only
-   in the app shell created in Step 10.
+   in `app/`, which is a nested Go module: root `make check` does not build
+   it. Work on the app with `make app-tidy` / `make app-dev` on a machine
+   that can fetch modules; keep `app/frontend/dist` free of build tooling
+   (it is embedded as-is).
 5. **Never call real coding-client binaries or networks in unit tests.**
    Adapters are tested against recorded fixtures in `testdata/`. Verify real
    CLI flags manually (`<client> --help`) and record what you verified, with
