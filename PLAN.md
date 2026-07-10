@@ -134,10 +134,19 @@ in a compiling state**.
   not compiled — expect at most minor binding-API fixes, and pin the
   exact wails version go mod tidy resolves.
 
-- [ ] **Step 11 — Providers & config.** Config file (`config.yaml` or JSON)
-  for provider base URLs / API keys env passthrough, including
-  OpenAI-compatible endpoints such as LocalAI, and per-adapter model lists.
-  Surface in the GUI model picker.
+- [x] **Step 11 — Providers & config.** `internal/config` +
+  `internal/clients`. JSON config at `<data>/config.json` (stdlib-only,
+  so JSON not YAML; missing file = valid empty config, malformed file =
+  loud error). Providers are named env-var sets with `${VAR}` expansion
+  (secrets stay in the process env, e.g. a LocalAI endpoint via
+  OPENAI_API_BASE); clients get a default provider, extra env, default
+  TurnRequest.Extra (per-turn values win), binary overrides, and model
+  picker additions (append-with-dedupe or replace_models). `clients.New`
+  assembles the one registry both the CLI and the app use; `Set.Models`
+  merges lists, `Set.Prepare` applies defaults before every turn. Example
+  recipes (LocalAI, OpenRouter) in docs/config.example.json. Tests cover
+  load/validation, expansion, apply precedence, model merging, and
+  binary overrides.
 
 - [ ] **Step 12 (optional) — MCP callback channel.** Expose an MCP server
   from the app so clients that support MCP (Claude Code, Codex) can push

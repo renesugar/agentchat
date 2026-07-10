@@ -1,0 +1,45 @@
+{
+  "providers": {
+    "localai": {
+      "env": {
+        "OPENAI_API_BASE": "http://localhost:8080/v1",
+        "OPENAI_BASE_URL": "http://localhost:8080/v1",
+        "OPENAI_API_KEY": "${LOCALAI_API_KEY}"
+      }
+    },
+    "openrouter": {
+      "env": {
+        "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
+        "OPENAI_API_BASE": "https://openrouter.ai/api/v1",
+        "OPENAI_API_KEY": "${OPENROUTER_API_KEY}"
+      }
+    }
+  },
+  "clients": {
+    "aider": {
+      "provider": "localai",
+      "env": { "AIDER_CHECK_UPDATE": "false" },
+      "models": [
+        { "id": "openai/qwen3-coder", "label": "Qwen3 Coder (LocalAI)" }
+      ]
+    },
+    "swival": {
+      "extra": {
+        "provider": "generic",
+        "base_url": "http://localhost:8080/v1"
+      },
+      "models": [
+        { "id": "qwen3-coder", "label": "Qwen3 Coder (LocalAI)" }
+      ]
+    },
+    "claude": {
+      "binary": "claude",
+      "models": [
+        { "id": "claude-sonnet-4-6", "label": "Sonnet 4.6 (pinned)" }
+      ]
+    },
+    "codex": {
+      "extra": { "sandbox": "workspace-write" }
+    }
+  }
+}

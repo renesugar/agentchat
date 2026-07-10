@@ -1,5 +1,11 @@
 # Coding-client CLI invocations
 
+Provider endpoints (LocalAI, OpenRouter, ...) and per-client overrides
+live in `<data>/config.json` — see `docs/config.example.json` and
+`internal/config`. Recipes: aider → provider env (OPENAI_API_BASE +
+OPENAI_API_KEY); swival → `extra: {provider: generic, base_url: ...}`;
+claude/codex → their own env/config conventions.
+
 Record here the *verified* non-interactive invocation for each client, with
 the client version you verified it against. Planned invocations (unverified)
 are marked ⚠ — verify with `<client> --help` before implementing the adapter

@@ -11,12 +11,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/aider"
-	"github.com/example/agentchat/internal/adapters/claudecode"
-	"github.com/example/agentchat/internal/adapters/codex"
-	"github.com/example/agentchat/internal/adapters/echo"
-	"github.com/example/agentchat/internal/adapters/swival"
 	"github.com/example/agentchat/internal/artifact"
+	"github.com/example/agentchat/internal/clients"
+	"github.com/example/agentchat/internal/config"
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/export"
 	"github.com/example/agentchat/internal/transcript"
@@ -29,7 +26,7 @@ type App struct {
 	store *transcript.FSStore
 	lib   *artifact.Library
 	mgr   *workspace.Manager
-	reg   *adapter.Registry
+	set   *clients.Set
 	eng   *engine.Engine
 
 	mu       sync.Mutex
@@ -64,19 +61,18 @@ func NewApp(dataDir string) (*App, error) {
 		return nil, err
 	}
 
-	reg := adapter.NewRegistry()
-	reg.Register(claudecode.New())
-	reg.Register(codex.New())
-	reg.Register(aider.New())
-	reg.Register(swival.New())
-	reg.Register(echo.New())
+	cfg, err := config.Load(filepath.Join(dataDir, "config.json"))
+	if err != nil {
+		return nil, err
+	}
+	set := clients.New(cfg)
 
 	return &App{
 		store:    store,
 		lib:      lib,
 		mgr:      mgr,
-		reg:      reg,
-		eng:      engine.New(reg, store),
+		set:      set,
+		eng:      engine.New(set.Registry, store),
 		wsByConv: make(map[string]*workspace.Workspace),
 		running:  make(map[string]bool),
 	}, nil
@@ -97,8 +93,8 @@ type AdapterInfo struct {
 // Adapters lists registered coding clients with availability and models.
 func (a *App) Adapters() ([]AdapterInfo, error) {
 	var out []AdapterInfo
-	for _, name := range a.reg.Names() {
-		ad, err := a.reg.Get(name)
+	for _, name := range a.set.Registry.Names() {
+		ad, err := a.set.Registry.Get(name)
 		if err != nil {
 			continue
 		}
@@ -107,7 +103,7 @@ func (a *App) Adapters() ([]AdapterInfo, error) {
 			info.Available = false
 			info.Detail = err.Error()
 		}
-		if models, err := ad.Models(a.ctx); err == nil {
+		if models, err := a.set.Models(a.ctx, name); err == nil {
 			info.Models = models
 		}
 		out = append(out, info)
@@ -218,11 +214,14 @@ func (a *App) Run(convID, client, model, prompt string) (*transcript.Turn, error
 		runtime.EventsEmit(a.ctx, "turn-event", turnEvent{ConversationID: convID, Event: ev})
 	}
 
-	turn, runErr := a.eng.RunTurn(a.ctx, convID, client, ws, adapter.TurnRequest{
+	req := adapter.TurnRequest{
 		Prompt:    prompt,
 		Model:     model,
 		SessionID: sessionID,
-	}, tap)
+	}
+	a.set.Prepare(client, &req)
+
+	turn, runErr := a.eng.RunTurn(a.ctx, convID, client, ws, req, tap)
 	if turn == nil && runErr != nil {
 		return nil, runErr // setup failure (unknown client, unavailable, storage)
 	}

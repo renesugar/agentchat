@@ -70,7 +70,10 @@ point of the app.
 
 9. **LocalAI's role.** LocalAI (and any OpenAI-compatible server) is a
    *model provider that coding clients point at* via base-URL config — it
-   is not UI scaffolding for this app. Provider config is Step 11.
+   is not UI scaffolding for this app. Configure it as a provider env set
+   in config.json (see docs/config.example.json); each client reads its
+   own variables, so provider entries are explicit env maps rather than a
+   magic base_url the app would have to translate per client.
 
 10. **Dependencies.** Core stays stdlib-only as long as practical; `git`
     is used by shelling out (no cgo/go-git). Wails and any DB driver enter

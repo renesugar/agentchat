@@ -24,12 +24,9 @@ import (
 	"strings"
 
 	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/aider"
-	"github.com/example/agentchat/internal/adapters/claudecode"
-	"github.com/example/agentchat/internal/adapters/codex"
-	"github.com/example/agentchat/internal/adapters/echo"
-	"github.com/example/agentchat/internal/adapters/swival"
 	"github.com/example/agentchat/internal/artifact"
+	"github.com/example/agentchat/internal/clients"
+	"github.com/example/agentchat/internal/config"
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/export"
 	"github.com/example/agentchat/internal/transcript"
@@ -62,23 +59,21 @@ func run() error {
 	)
 	flag.Parse()
 
-	reg := adapter.NewRegistry()
-	reg.Register(echo.New())
-	reg.Register(claudecode.New())
-	reg.Register(codex.New())
-	reg.Register(aider.New())
-	reg.Register(swival.New())
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-
-	if *listOnly {
-		return listAdapters(ctx, reg)
-	}
 
 	store, err := openStore(*dataDir)
 	if err != nil {
 		return err
+	}
+	cfg, err := config.Load(filepath.Join(store.Root(), "config.json"))
+	if err != nil {
+		return err
+	}
+	set := clients.New(cfg)
+
+	if *listOnly {
+		return listAdapters(ctx, set)
 	}
 
 	if *listConvs {
@@ -191,13 +186,16 @@ func run() error {
 		printEvent(e)
 	}
 
-	eng := engine.New(reg, store)
-	turn, err := eng.RunTurn(ctx, id, *client, ws, adapter.TurnRequest{
+	req := adapter.TurnRequest{
 		Prompt:    prompt,
 		WorkDir:   absDir,
 		Model:     *model,
 		SessionID: *session,
-	}, tap)
+	}
+	set.Prepare(*client, &req)
+
+	eng := engine.New(set.Registry, store)
+	turn, err := eng.RunTurn(ctx, id, *client, ws, req, tap)
 	if err != nil {
 		return err
 	}
@@ -227,14 +225,14 @@ func openStore(dataDir string) (*transcript.FSStore, error) {
 	return transcript.NewFSStore(dir)
 }
 
-func listAdapters(ctx context.Context, reg *adapter.Registry) error {
-	for _, name := range reg.Names() {
-		a, _ := reg.Get(name)
+func listAdapters(ctx context.Context, set *clients.Set) error {
+	for _, name := range set.Registry.Names() {
+		a, _ := set.Registry.Get(name)
 		status := "available"
 		if err := a.Available(ctx); err != nil {
 			status = "unavailable: " + err.Error()
 		}
-		models, err := a.Models(ctx)
+		models, err := set.Models(ctx, name)
 		if err != nil {
 			return fmt.Errorf("%s: listing models: %w", name, err)
 		}
