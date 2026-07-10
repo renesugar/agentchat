@@ -58,7 +58,7 @@ func TestRunTurnSnapshotsWorkspace(t *testing.T) {
 	conv, _ := store.CreateConversation(ctx, transcript.NewConversation{Title: "ws"})
 
 	// Turn 1 (echo): snapshot recorded; adapter-reported changes kept.
-	t1, err := eng.RunTurn(ctx, conv.ID, "echo", ws, adapter.TurnRequest{Prompt: "one"}, nil)
+	t1, err := eng.RunTurn(ctx, conv.ID, "echo", ws, adapter.TurnRequest{Prompt: "one", Effort: "high"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,6 +67,16 @@ func TestRunTurnSnapshotsWorkspace(t *testing.T) {
 	}
 	if t1.WorkspaceRef != ws.Dir {
 		t.Fatalf("WorkspaceRef = %q, want %q", t1.WorkspaceRef, ws.Dir)
+	}
+	// Effort is recorded on the turn and reached the client (echo writes
+	// it into ECHO.md), proving the end-to-end plumbing.
+	if t1.Effort != "high" {
+		t.Fatalf("turn 1 Effort = %q, want %q", t1.Effort, "high")
+	}
+	if b, err := os.ReadFile(filepath.Join(ws.Dir, "ECHO.md")); err != nil {
+		t.Fatal(err)
+	} else if !strings.Contains(string(b), "effort: high") {
+		t.Fatalf("ECHO.md missing effort line:\n%s", b)
 	}
 	if len(t1.Result.FilesChanged) != 1 || t1.Result.FilesChanged[0].Path != "ECHO.md" {
 		t.Fatalf("turn 1 FilesChanged = %+v", t1.Result.FilesChanged)

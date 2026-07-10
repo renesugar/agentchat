@@ -77,6 +77,7 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 	turn, err := e.Store.BeginTurn(ctx, convID, transcript.NewTurn{
 		Client:       client,
 		Model:        req.Model,
+		Effort:       req.Effort,
 		WorkspaceRef: req.WorkDir,
 		Prompt:       req.Prompt,
 	})

@@ -44,7 +44,8 @@ func buildFixtureConversation(t *testing.T) (*transcript.FSStore, *artifact.Libr
 
 	// Turn 1: success with plan, text, file change, usage, snapshot.
 	t1, _ := store.BeginTurn(ctx, conv.ID, transcript.NewTurn{
-		Client: "claude", Model: "sonnet", Prompt: "Personalize the greeting.\nKeep it short.",
+		Client: "claude", Model: "sonnet", Effort: "high",
+		Prompt:       "Personalize the greeting.\nKeep it short.",
 		WorkspaceRef: "/home/user/proj",
 	})
 	for _, ev := range []adapter.Event{

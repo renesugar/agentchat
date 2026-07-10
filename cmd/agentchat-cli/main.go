@@ -46,6 +46,7 @@ func run() error {
 		client    = flag.String("client", "echo", "coding client adapter to use")
 		dir       = flag.String("dir", ".", "workspace directory")
 		model     = flag.String("model", "", "model ID (adapter default if empty)")
+		effort    = flag.String("effort", "", "reasoning effort level (client default if empty; client validates values)")
 		session   = flag.String("resume", "", "session ID from a previous turn")
 		convID    = flag.String("conv", "", "conversation ID to continue (new one if empty)")
 		title     = flag.String("title", "", "title for a new conversation")
@@ -192,6 +193,7 @@ func run() error {
 		Prompt:    prompt,
 		WorkDir:   absDir,
 		Model:     *model,
+		Effort:    *effort,
 		SessionID: *session,
 	}
 	set.Prepare(*client, &req)

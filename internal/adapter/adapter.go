@@ -34,6 +34,12 @@ type TurnRequest struct {
 	// SessionID resumes a prior session when the client supports it
 	// (value comes from a previous Result.SessionID).
 	SessionID string
+	// Effort is the reasoning-effort level for this turn; empty = client
+	// default. Values pass through to the client, which owns validation
+	// (the common scale is none/low/medium/high, plus client-specific
+	// extremes like claude's xhigh/max). Adapters map it to the client's
+	// flag and only drop it when the client has no effort control at all.
+	Effort string
 	// Env is extra environment (API keys, base URLs such as a LocalAI
 	// endpoint) appended to the client process environment.
 	Env []string

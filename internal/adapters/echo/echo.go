@@ -52,7 +52,9 @@ func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit ada
 	emit(adapter.Event{Kind: adapter.EventToolUse, Time: time.Now(),
 		Tool: &adapter.ToolInfo{Name: "write_file", Input: name}})
 
-	content := fmt.Sprintf("# Echo\n\nmodel: %s\n\n%s\n", req.Model, req.Prompt)
+	// Effort is recorded so engine/UI tests can assert the plumbing
+	// end to end without a real client.
+	content := fmt.Sprintf("# Echo\n\nmodel: %s\neffort: %s\n\n%s\n", req.Model, req.Effort, req.Prompt)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		emit(adapter.Event{Kind: adapter.EventError, Time: time.Now(), Text: err.Error()})
 		return nil, fmt.Errorf("echo: write %s: %w", name, err)

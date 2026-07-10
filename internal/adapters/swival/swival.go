@@ -71,9 +71,10 @@ func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 // piped to stdin (documented behavior when no positional task is given and
 // stdin is not a TTY). Kept separate from RunTurn for unit testing.
 //
-// Recognized Extra keys: profile, provider, base_url, reasoning_effort,
-// max_turns, diagnostics ("false" adds --quiet and disables the stderr
-// thinking stream). SessionID is ignored — swival has no session resume;
+// Recognized Extra keys: profile, provider, base_url, reasoning_effort
+// (back-compat override of the first-class req.Effort field), max_turns,
+// diagnostics ("false" adds --quiet and disables the stderr thinking
+// stream). SessionID is ignored — swival has no session resume;
 // continuity comes from .swival/ state in the workspace.
 func buildArgs(req adapter.TurnRequest, reportPath string) []string {
 	var args []string
@@ -92,8 +93,12 @@ func buildArgs(req adapter.TurnRequest, reportPath string) []string {
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	effort := req.Effort
 	if v := req.Extra["reasoning_effort"]; v != "" {
-		args = append(args, "--reasoning-effort", v)
+		effort = v // Extra wins for back-compat with pre-Step-13 configs
+	}
+	if effort != "" {
+		args = append(args, "--reasoning-effort", effort)
 	}
 	if v := req.Extra["max_turns"]; v != "" {
 		args = append(args, "--max-turns", v)

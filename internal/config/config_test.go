@@ -27,6 +27,7 @@ const sample = `{
       "provider": "localai",
       "env": { "AIDER_CHECK_UPDATE": "false" },
       "extra": { "restore_chat_history": "true" },
+      "default_effort": "medium",
       "models": [
         { "id": "openai/qwen3-coder", "label": "Qwen3 Coder (LocalAI)" },
         { "id": "sonnet", "label": "Sonnet (renamed)" }
@@ -98,6 +99,16 @@ func TestApply(t *testing.T) {
 	}
 	if req.Extra["restore_chat_history"] != "false" {
 		t.Errorf("per-turn Extra overwritten: %v", req.Extra)
+	}
+	if req.Effort != "medium" {
+		t.Errorf("Effort = %q, want configured default \"medium\"", req.Effort)
+	}
+
+	// A per-turn effort beats the configured default.
+	reqE := adapter.TurnRequest{Effort: "xhigh"}
+	c.Apply("aider", &reqE)
+	if reqE.Effort != "xhigh" {
+		t.Errorf("per-turn Effort overwritten: %q", reqE.Effort)
 	}
 
 	// A client with only Extra defaults fills a nil map.

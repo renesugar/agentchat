@@ -40,9 +40,10 @@ Go 1.26.
 - `Conversations()`, `Turns(conv)`, `Events(conv, turn)` — transcript reads
 - `CreateConversation(title, repoPath)` — repoPath "" → managed scratch
   workspace; a git repo path → snapshot-managed repo workspace
-- `Run(conv, client, model, prompt)` — executes a turn; every normalized
-  event is also pushed to the frontend as the Wails event `turn-event`
-  with payload `{conversationId, event}`
+- `Run(conv, client, model, effort, prompt)` — executes a turn (effort ""
+  = client default); every normalized event is also pushed to the
+  frontend as the Wails event `turn-event` with payload
+  `{conversationId, event}`
 - `ExportMarkdown(conv)` / `ExportBundle(conv)` — save-dialog exports
 - `Artifacts(conv)` — the conversation's artifact records
 

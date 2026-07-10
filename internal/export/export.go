@@ -90,6 +90,9 @@ func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) 
 	if model == "" {
 		model = "default model"
 	}
+	if t.Effort != "" {
+		model += ", effort " + t.Effort
+	}
 	fmt.Fprintf(b, "\n---\n\n## Turn %d — %s (%s) — %s\n\n", t.Seq, t.Client, model, t.Status)
 
 	b.WriteString("**Prompt:**\n\n")

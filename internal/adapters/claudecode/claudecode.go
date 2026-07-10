@@ -72,6 +72,12 @@ func buildArgs(req adapter.TurnRequest) []string {
 	if req.SessionID != "" {
 		args = append(args, "--resume", req.SessionID)
 	}
+	if req.Effort != "" {
+		// Launch flag is the reliable path: the /effort command is "Not
+		// applied" on some models in non-interactive runs. Levels on
+		// claude 2.1.206: low, medium, high, xhigh, max.
+		args = append(args, "--effort", req.Effort)
+	}
 	mode := DefaultPermissionMode
 	if m, ok := req.Extra["permission_mode"]; ok {
 		mode = m

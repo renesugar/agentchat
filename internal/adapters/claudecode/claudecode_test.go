@@ -130,11 +130,12 @@ func TestBuildArgs(t *testing.T) {
 	}
 
 	got = buildArgs(adapter.TurnRequest{
-		Prompt: "-continue", Model: "opus", SessionID: "sess-1",
+		Prompt: "-continue", Model: "opus", SessionID: "sess-1", Effort: "xhigh",
 		Extra: map[string]string{"permission_mode": "plan"},
 	})
 	want = []string{"-p", "--output-format", "stream-json", "--verbose",
-		"--model", "opus", "--resume", "sess-1", "--permission-mode", "plan", "--", "-continue"}
+		"--model", "opus", "--resume", "sess-1", "--effort", "xhigh",
+		"--permission-mode", "plan", "--", "-continue"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("full args:\n got %v\nwant %v", got, want)
 	}

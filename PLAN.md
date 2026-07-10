@@ -172,41 +172,22 @@ in a compiling state**.
   revocation). Verified live: claude 2.1.206 called both tools over the
   channel end to end (docs/adapters.md).
 
-- [ ] **Step 13 — Effort control.** Make reasoning effort a first-class
-  per-turn setting alongside the model (may be implemented before Step 12).
-  Today only swival honors effort, via `Extra["reasoning_effort"]`; the
-  other clients have effort controls the adapters don't map.
-  - `adapter.TurnRequest` gains `Effort string` (empty = client default).
-    Values are passed through to the client, which owns validation; the
-    common scale is none/low/medium/high (plus client-specific extremes
-    like claude's xhigh/max). Adapters ignore unsupported values only if
-    the client would reject the flag entirely — otherwise pass through
-    and let the client's error surface as usual.
-  - Adapter mapping (verify each flag against the installed client and
-    record versions in docs/adapters.md, as with Steps 3-6):
-    claude → `--effort <level>` at launch (levels low/medium/high/xhigh/
-    max; note non-interactive `/effort` is "Not applied" on some models,
-    so the launch flag is the only reliable path);
-    codex → `-c model_reasoning_effort="<level>"` (verify exact config
-    key with `codex exec --help` / docs);
-    aider → `--reasoning-effort <level>` (best-effort; litellm forwards
-    it only for models that support it);
-    swival → `--reasoning-effort <level>` (migrate the existing
-    Extra["reasoning_effort"] path to the new field, keeping Extra as an
-    override for back-compat);
-    echo → record the effort in ECHO.md so engine/UI tests can assert
-    end-to-end plumbing.
-  - Config: `clients.<name>.default_effort` applied by Config.Apply when
-    the request doesn't set one (same precedence rule as Extra: per-turn
-    wins). Optionally allow `models[].effort` later; not in scope now.
-  - CLI: `-effort` flag on agentchat-cli.
-  - GUI: an effort select in the composer next to the model picker
-    (default option "client default"); `App.Run` gains the parameter and
-    the transcript turn header shows the effort when one was set (store
-    it on `transcript.Turn` so exports can include it — extend NewTurn/
-    Turn and the markdown renderer).
-  - Tests: buildArgs cases per adapter, config default-effort precedence,
-    engine round-trip via echo, golden transcript update.
+- [x] **Step 13 — Effort control.** Reasoning effort is a first-class
+  per-turn setting alongside the model. `adapter.TurnRequest.Effort`
+  (empty = client default) passes through to the client, which owns
+  validation. Adapter mapping (all verified against installed clients,
+  versions in docs/adapters.md): claude → `--effort` (low…max;
+  live-verified), codex → `-c model_reasoning_effort="…"` (key verified
+  via --strict-config probing; value validated by the model, not at
+  parse time), aider → `--reasoning-effort` (best-effort via litellm),
+  swival → `--reasoning-effort` with Extra["reasoning_effort"] kept as
+  back-compat override, echo → records `effort:` in ECHO.md for
+  end-to-end tests. Config: `clients.<name>.default_effort` applied by
+  Config.Apply (per-turn wins). Effort is stored on transcript.Turn,
+  shown in the markdown turn header ("client (model, effort X)"), the
+  GUI turn header, and offered as a composer select; CLI `-effort`;
+  `App.Run(conv, client, model, effort, prompt)`. Tests: buildArgs per
+  adapter, config precedence, engine echo round trip, golden update.
 
 - [ ] **Step 14 — Per-turn copy.** Let users copy one turn as markdown
   without exporting the whole conversation.

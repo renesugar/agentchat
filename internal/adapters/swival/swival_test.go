@@ -33,6 +33,22 @@ func TestBuildArgs(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("full args:\n got %v\nwant %v", got, want)
 	}
+
+	// First-class Effort field maps to --reasoning-effort...
+	got = buildArgs(adapter.TurnRequest{Prompt: "task", Effort: "low"}, "/tmp/r.json")
+	want = []string{"--reasoning-effort", "low", "--report", "/tmp/r.json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("effort args:\n got %v\nwant %v", got, want)
+	}
+	// ...and the legacy Extra key still wins for back-compat.
+	got = buildArgs(adapter.TurnRequest{
+		Prompt: "task", Effort: "low",
+		Extra: map[string]string{"reasoning_effort": "xhigh"},
+	}, "/tmp/r.json")
+	want = []string{"--reasoning-effort", "xhigh", "--report", "/tmp/r.json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("extra-override args:\n got %v\nwant %v", got, want)
+	}
 }
 
 func TestApplyReport(t *testing.T) {

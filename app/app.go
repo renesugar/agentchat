@@ -201,10 +201,11 @@ type turnEvent struct {
 }
 
 // Run executes one turn and streams its events to the frontend as the
-// Wails event "turn-event". It returns the finished turn record; a client
-// failure is reported in Turn.Status/Error rather than as a hard error, so
-// the UI can render it in place.
-func (a *App) Run(convID, client, model, prompt string) (*transcript.Turn, error) {
+// Wails event "turn-event". effort "" means client default (a configured
+// default_effort may still apply). It returns the finished turn record; a
+// client failure is reported in Turn.Status/Error rather than as a hard
+// error, so the UI can render it in place.
+func (a *App) Run(convID, client, model, effort, prompt string) (*transcript.Turn, error) {
 	a.mu.Lock()
 	if a.running[convID] {
 		a.mu.Unlock()
@@ -243,6 +244,7 @@ func (a *App) Run(convID, client, model, prompt string) (*transcript.Turn, error
 	req := adapter.TurnRequest{
 		Prompt:    prompt,
 		Model:     model,
+		Effort:    effort,
 		SessionID: sessionID,
 	}
 	a.set.Prepare(client, &req)

@@ -80,6 +80,12 @@ func buildArgs(req adapter.TurnRequest) []string {
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	if req.Effort != "" {
+		// Config key verified on codex-cli 0.142.5 (--strict-config
+		// accepts it; unknown keys error). Values are validated by the
+		// client/model, not at config parse time.
+		args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", req.Effort))
+	}
 	if req.MCP != nil {
 		// Streamable-HTTP MCP server via config overrides (verified on
 		// codex-cli 0.142.5: `codex mcp add --url/--bearer-token-env-var`

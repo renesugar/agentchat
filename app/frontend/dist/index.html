@@ -69,6 +69,15 @@
           <div class="picker">
             <select id="client" aria-label="Coding client"></select>
             <select id="model" aria-label="Model"></select>
+            <select id="effort" aria-label="Reasoning effort" title="Reasoning effort (validated by the client)">
+              <option value="">Effort: client default</option>
+              <option value="minimal">minimal</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+            </select>
           </div>
           <textarea id="prompt" rows="3"
             placeholder="Describe the next turn's task… (Ctrl+Enter to run)"></textarea>

@@ -7,7 +7,7 @@
 
 ---
 
-## Turn 1 — claude (sonnet) — done
+## Turn 1 — claude (sonnet, effort high) — done
 
 **Prompt:**
 

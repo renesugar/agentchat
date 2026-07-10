@@ -33,7 +33,11 @@ and update this file in the same commit.
   usage) all match the parser; resume keeps the same session_id. New
   stream line types `rate_limit_event` and `system/thinking_tokens`
   appear and are ignored (unknown types are skipped by design) — no
-  fixture drift. `--effort <level>` exists at launch (Step 13).
+  fixture drift.
+- Effort (Step 13): `--effort <level>`, levels low/medium/high/xhigh/max
+  (claude 2.1.206 --help; live-verified with `-effort low` through the
+  CLI). The launch flag is the reliable path — the interactive /effort
+  command is "Not applied" on some models in non-interactive runs.
 - MCP callback (Step 12): when the engine provides a channel, the
   adapter adds `--mcp-config '{"mcpServers":{"agentchat":{"type":"http",
   "url":..., "headers":{"Authorization":"Bearer <token>"}}}}'` and
@@ -75,6 +79,12 @@ and update this file in the same commit.
   code -32600) instead of silently starting a new session — the turn
   errors and the transcript keeps the old session, which is the better
   outcome for continuity.
+- Effort (Step 13): `-c model_reasoning_effort="<level>"`. Key verified
+  on codex-cli 0.142.5: with `--strict-config` an unknown key errors
+  ("unknown configuration field") while this one is accepted; the VALUE
+  is not validated at config-parse time (a bogus value still launched),
+  so bad levels surface as model/API errors. Documented levels:
+  minimal/low/medium/high (xhigh on newer models).
 - MCP callback (Step 12): `-c mcp_servers.agentchat.url="<url>" -c
   mcp_servers.agentchat.bearer_token_env_var="AGENTCHAT_MCP_TOKEN"`
   with the token passed through the environment, never argv (keys per
@@ -102,6 +112,9 @@ and update this file in the same commit.
 - API keys/base URLs (incl. OpenAI-compatible servers like LocalAI) pass
   through the environment (OPENAI_API_KEY, OPENAI_API_BASE,
   ANTHROPIC_API_KEY, ...) via TurnRequest.Env — Step 11 wires config.
+- Effort (Step 13): `--reasoning-effort <level>` (aider 0.86.2 --help:
+  "Set the reasoning_effort API parameter"; free-form value — litellm
+  forwards it only for models that support it, so it is best-effort).
 - ✅ Verified (aider 0.86.2, 2026-07-10): all flags (--message,
   --yes-always, --no-stream, --no-pretty, --model,
   --restore-chat-history, and --reasoning-effort for Step 13) accepted
@@ -137,6 +150,10 @@ and update this file in the same commit.
   profile, reasoning_effort, max_turns. API keys go through the
   environment (HF_TOKEN, OPENROUTER_API_KEY, OPENAI_API_KEY, ...), never
   the command line.
+- Effort (Step 13): first-class `req.Effort` → `--reasoning-effort
+  <level>` (swival 1.0.25 --help levels: none, minimal, low, medium,
+  high, xhigh, default). The legacy Extra["reasoning_effort"] still
+  works and overrides the field for back-compat.
 - No session resume: continuity comes from .swival/ state (memory,
   history) inside the workspace, which persists across turns under this
   app's workspace model. SessionID is ignored.

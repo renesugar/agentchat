@@ -60,6 +60,10 @@ type Client struct {
 	Env map[string]string `json:"env,omitempty"`
 	// Extra sets default TurnRequest.Extra values (per-turn values win).
 	Extra map[string]string `json:"extra,omitempty"`
+	// DefaultEffort sets TurnRequest.Effort when the turn doesn't pick a
+	// level (per-turn values win). Passed through to the client, which
+	// owns validation — e.g. claude: low/medium/high/xhigh/max.
+	DefaultEffort string `json:"default_effort,omitempty"`
 	// Models are added to the client's model picker; with ReplaceModels
 	// they replace the adapter's built-in list entirely.
 	Models        []adapter.Model `json:"models,omitempty"`
@@ -111,8 +115,9 @@ func (c *Config) Binary(client string) string {
 
 // Apply fills a TurnRequest with the client's configured defaults:
 // provider env then client env are appended to req.Env (later entries win
-// for duplicate variables in the child process), and Extra defaults are
-// set only where the request doesn't already define the key.
+// for duplicate variables in the child process), Extra defaults are set
+// only where the request doesn't already define the key, and
+// DefaultEffort applies only when the request picked no effort.
 func (c *Config) Apply(client string, req *adapter.TurnRequest) {
 	cl, ok := c.Clients[client]
 	if !ok {
@@ -122,6 +127,10 @@ func (c *Config) Apply(client string, req *adapter.TurnRequest) {
 		req.Env = append(req.Env, expandEnv(p.Env)...)
 	}
 	req.Env = append(req.Env, expandEnv(cl.Env)...)
+
+	if req.Effort == "" {
+		req.Effort = cl.DefaultEffort
+	}
 
 	if len(cl.Extra) > 0 {
 		if req.Extra == nil {

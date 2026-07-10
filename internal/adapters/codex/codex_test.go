@@ -136,11 +136,12 @@ func TestBuildArgs(t *testing.T) {
 	}
 
 	got = buildArgs(adapter.TurnRequest{
-		Prompt: "continue", Model: "gpt-5-codex", SessionID: "0199-abc",
+		Prompt: "continue", Model: "gpt-5-codex", SessionID: "0199-abc", Effort: "low",
 		Extra: map[string]string{"sandbox": "read-only", "skip_git_repo_check": "false"},
 	})
 	want = []string{"exec", "--json", "--sandbox", "read-only",
-		"--model", "gpt-5-codex", "resume", "0199-abc", "-"}
+		"--model", "gpt-5-codex", "-c", `model_reasoning_effort="low"`,
+		"resume", "0199-abc", "-"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("full args:\n got %v\nwant %v", got, want)
 	}

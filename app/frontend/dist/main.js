@@ -127,6 +127,7 @@ function turnHeader(turn) {
   who.append(el("span", "seq", `#${turn.seq}`));
   who.append(document.createTextNode(`▌${turn.client} `));
   who.append(el("span", "model", turn.model || "default model"));
+  if (turn.effort) who.append(el("span", "model", `effort ${turn.effort}`));
   if (turn.status === "failed") who.append(el("span", "status-failed", "failed"));
   return who;
 }
@@ -254,6 +255,7 @@ async function runTurn(evSubmit) {
 
   const client = $("client").value;
   const model = $("model").value;
+  const effort = $("effort").value;
   const convID = state.current.id;
 
   state.running = true;
@@ -267,6 +269,7 @@ async function runTurn(evSubmit) {
   const who = el("div", "who");
   who.append(document.createTextNode(`▌${client} `));
   who.append(el("span", "model", model || "default model"));
+  if (effort) who.append(el("span", "model", `effort ${effort}`));
   wrap.append(who);
   wrap.append(el("div", "prompt", prompt));
   const body = el("div", "turn-body");
@@ -278,7 +281,7 @@ async function runTurn(evSubmit) {
   state.liveTurnEl = body;
 
   try {
-    const turn = await api().Run(convID, client, model, prompt);
+    const turn = await api().Run(convID, client, model, effort, prompt);
     // Replace the optimistic block with the authoritative record.
     const events = (await api().Events(convID, turn.id)) || [];
     wrap.replaceWith(renderTurn(turn, events));

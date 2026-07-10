@@ -77,6 +77,11 @@ func buildArgs(req adapter.TurnRequest) []string {
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	if req.Effort != "" {
+		// Best-effort: litellm forwards reasoning_effort only for models
+		// that support it (flag exists on aider 0.86.2).
+		args = append(args, "--reasoning-effort", req.Effort)
+	}
 	if req.Extra["restore_chat_history"] == "true" {
 		args = append(args, "--restore-chat-history")
 	}

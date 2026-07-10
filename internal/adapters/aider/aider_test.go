@@ -94,11 +94,11 @@ func TestBuildArgs(t *testing.T) {
 	}
 
 	got = buildArgs(adapter.TurnRequest{
-		Prompt: "continue", Model: "sonnet", SessionID: "ignored",
+		Prompt: "continue", Model: "sonnet", SessionID: "ignored", Effort: "high",
 		Extra: map[string]string{"restore_chat_history": "true"},
 	})
 	want = []string{"--message", "continue", "--yes-always", "--no-stream", "--no-pretty",
-		"--model", "sonnet", "--restore-chat-history"}
+		"--model", "sonnet", "--reasoning-effort", "high", "--restore-chat-history"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("full args:\n got %v\nwant %v", got, want)
 	}
