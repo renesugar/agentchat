@@ -153,6 +153,42 @@ in a compiling state**.
   progress/artifacts directly. Output capture from Steps 3–6 remains the
   baseline; MCP is an enhancement, never a requirement.
 
+- [ ] **Step 13 — Effort control.** Make reasoning effort a first-class
+  per-turn setting alongside the model (may be implemented before Step 12).
+  Today only swival honors effort, via `Extra["reasoning_effort"]`; the
+  other clients have effort controls the adapters don't map.
+  - `adapter.TurnRequest` gains `Effort string` (empty = client default).
+    Values are passed through to the client, which owns validation; the
+    common scale is none/low/medium/high (plus client-specific extremes
+    like claude's xhigh/max). Adapters ignore unsupported values only if
+    the client would reject the flag entirely — otherwise pass through
+    and let the client's error surface as usual.
+  - Adapter mapping (verify each flag against the installed client and
+    record versions in docs/adapters.md, as with Steps 3-6):
+    claude → `--effort <level>` at launch (levels low/medium/high/xhigh/
+    max; note non-interactive `/effort` is "Not applied" on some models,
+    so the launch flag is the only reliable path);
+    codex → `-c model_reasoning_effort="<level>"` (verify exact config
+    key with `codex exec --help` / docs);
+    aider → `--reasoning-effort <level>` (best-effort; litellm forwards
+    it only for models that support it);
+    swival → `--reasoning-effort <level>` (migrate the existing
+    Extra["reasoning_effort"] path to the new field, keeping Extra as an
+    override for back-compat);
+    echo → record the effort in ECHO.md so engine/UI tests can assert
+    end-to-end plumbing.
+  - Config: `clients.<name>.default_effort` applied by Config.Apply when
+    the request doesn't set one (same precedence rule as Extra: per-turn
+    wins). Optionally allow `models[].effort` later; not in scope now.
+  - CLI: `-effort` flag on agentchat-cli.
+  - GUI: an effort select in the composer next to the model picker
+    (default option "client default"); `App.Run` gains the parameter and
+    the transcript turn header shows the effort when one was set (store
+    it on `transcript.Turn` so exports can include it — extend NewTurn/
+    Turn and the markdown renderer).
+  - Tests: buildArgs cases per adapter, config default-effort precedence,
+    engine round-trip via echo, golden transcript update.
+
 ## Definition of done for any step
 
 1. `make check` passes (fmt, vet, test).
