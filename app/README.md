@@ -47,6 +47,10 @@ Go 1.26.
 - `ExportMarkdown(conv)` / `ExportBundle(conv)` — save-dialog exports
 - `TurnMarkdown(conv, turn)` — one turn's markdown section (per-turn
   copy button in the transcript)
+- `DeleteConversation(conv)` — removes turns+events (artifacts kept);
+  refused while a turn is running
+- `ImportBundle()` — open-dialog restore of an exported bundle; refuses
+  ID collisions, associates a restored workspace for this session
 - `Artifacts(conv)` — the conversation's artifact records
 
 Workspace resolution per conversation: cached handle → the conversation's

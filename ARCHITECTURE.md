@@ -61,9 +61,15 @@ point of the app.
    generated files. For very large repos, store a *link* (local path +
    optional remote URL as an archival fallback) rather than a ZIP copy.
 
-7. **Export.** Any conversation can be exported as (a) a Markdown
-   transcript and (b) a ZIP of artifacts + final snapshot — portable
-   context for another coding client or another chat GUI.
+7. **Export & import.** Any conversation can be exported as (a) a
+   Markdown transcript and (b) a ZIP bundle of artifacts + final
+   snapshot — portable context for another coding client or another
+   chat GUI. Bundles are round-trippable (Step 15): bundle.json + the
+   raw store subtree under data/ let `export.Import` restore a deleted
+   or shared conversation byte-identically, re-create artifact records
+   (blobs dedupe in the CAS), and materialize the bundled snapshot tree
+   into a fresh scratch workspace. Imports never overwrite: an existing
+   conversation ID is refused.
 
 8. **Headless-first.** `internal/` never imports Wails. A CLI harness
    (`cmd/agentchat-cli`) exercises the whole engine, which keeps the core

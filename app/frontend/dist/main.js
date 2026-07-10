@@ -123,12 +123,14 @@ async function loadConversations(selectID) {
   for (const key of keys) {
     nav.append(el("div", "project", projectLabel(key)));
     for (const c of groups.get(key)) {
-      const btn = el("button", "conv");
-      btn.type = "button";
+      const btn = el("div", "conv");
+      btn.tabIndex = 0;
+      btn.setAttribute("role", "button");
       btn.append(el("span", "", c.title), el("span", "when", fmtWhen(c.updated_at)));
       btn.onclick = () => openConversation(c);
       if (state.current && state.current.id === c.id) btn.classList.add("active");
       btn.dataset.id = c.id;
+      btn.append(deleteButton(c));
       nav.append(btn);
     }
   }
@@ -136,6 +138,48 @@ async function loadConversations(selectID) {
   if (selectID) {
     const c = state.conversations.find((x) => x.id === selectID);
     if (c) await openConversation(c);
+  }
+}
+
+// deleteButton is a two-click delete control: the first click arms it
+// ("sure?"), a second click within 4s deletes. No modal dialogs, which
+// webviews handle unreliably.
+function deleteButton(conv) {
+  const del = el("button", "del-conv", "×");
+  del.type = "button";
+  del.title = "Delete conversation (artifacts are kept)";
+  del.onclick = async (ev) => {
+    ev.stopPropagation();
+    if (!del.classList.contains("arm")) {
+      del.classList.add("arm");
+      del.textContent = "sure?";
+      setTimeout(() => { del.classList.remove("arm"); del.textContent = "×"; }, 4000);
+      return;
+    }
+    try {
+      await api().DeleteConversation(conv.id);
+      if (state.current && state.current.id === conv.id) {
+        state.current = null;
+        $("conv-view").hidden = true;
+        $("empty-state").hidden = false;
+      }
+      toast("conversation deleted (artifacts kept)");
+      loadConversations();
+    } catch (err) {
+      toast(`delete failed: ${err}`);
+    }
+  };
+  return del;
+}
+
+async function importBundle() {
+  try {
+    const conv = await api().ImportBundle();
+    if (!conv) return; // dialog cancelled
+    toast(`imported "${conv.title}"`);
+    await loadConversations(conv.id);
+  } catch (err) {
+    toast(`import failed: ${err}`);
   }
 }
 
@@ -421,6 +465,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   };
   $("new-cancel").onclick = () => { $("new-form").hidden = true; };
   $("new-form").onsubmit = createConversation;
+  $("import-bundle").onclick = importBundle;
   $("pick-repo").onclick = async () => {
     try {
       const dir = await api().PickRepoDirectory();

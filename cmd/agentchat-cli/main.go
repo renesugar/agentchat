@@ -56,6 +56,8 @@ func run() error {
 		exportMD  = flag.String("export-md", "", "write a markdown transcript of -conv to this file, then exit")
 		exportSeq = flag.Int("export-turn", 0, "print turn <seq> of -conv as markdown to stdout, then exit")
 		exportZip = flag.String("export-bundle", "", "write a ZIP bundle of -conv (transcript+artifacts[+workspace via -dir]) to this file, then exit")
+		importZip = flag.String("import-bundle", "", "restore a conversation from this bundle ZIP, then exit")
+		deleteID  = flag.String("delete-conv", "", "delete this conversation (turns+events; artifacts are kept), then exit")
 		asJSON    = flag.Bool("json", false, "print events as JSON lines")
 		useMCP    = flag.Bool("mcp", true, "expose the MCP callback channel (loopback) to MCP-capable clients")
 		listOnly  = flag.Bool("list", false, "list adapters and models, then exit")
@@ -87,6 +89,34 @@ func run() error {
 		}
 		for _, c := range convs {
 			fmt.Printf("%s\t%s\t%s\t%s\n", c.ID, c.UpdatedAt.Format("2006-01-02 15:04"), c.Title, c.ProjectPath)
+		}
+		return nil
+	}
+
+	if *deleteID != "" {
+		if err := store.DeleteConversation(ctx, *deleteID); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "deleted conversation %s (artifacts kept)\n", *deleteID)
+		return nil
+	}
+
+	if *importZip != "" {
+		lib, err := artifact.NewLibrary(filepath.Join(store.Root(), "artifacts"))
+		if err != nil {
+			return err
+		}
+		mgr, err := workspace.NewManager(filepath.Join(store.Root(), "workspaces"))
+		if err != nil {
+			return err
+		}
+		conv, ws, err := export.Import(ctx, store, lib, mgr, *importZip)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "imported conversation %s (%q)\n", conv.ID, conv.Title)
+		if ws != nil {
+			fmt.Fprintf(os.Stderr, "workspace restored at %s (use -dir to continue there)\n", ws.Dir)
 		}
 		return nil
 	}

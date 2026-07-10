@@ -35,6 +35,11 @@ type Store interface {
 
 	ListTurns(ctx context.Context, convID string) ([]*Turn, error)
 	Events(ctx context.Context, convID, turnID string) ([]adapter.Event, error)
+
+	// DeleteConversation removes the conversation with all its turns and
+	// events. Artifacts are NOT deleted — they may be shared or exported
+	// (orphan cleanup can come later). Unknown IDs return ErrNotFound.
+	DeleteConversation(ctx context.Context, id string) error
 }
 
 // newID returns a sortable, unique identifier: UTC timestamp + random hex.

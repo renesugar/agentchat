@@ -183,6 +183,46 @@ func (a *App) CreateConversation(title, repoPath string) (*transcript.Conversati
 	return conv, nil
 }
 
+// DeleteConversation removes a conversation (turns and events; artifacts
+// are kept — they may be shared or exported). Refused while a turn is
+// running in it.
+func (a *App) DeleteConversation(convID string) error {
+	a.mu.Lock()
+	if a.running[convID] {
+		a.mu.Unlock()
+		return fmt.Errorf("a turn is running in this conversation")
+	}
+	delete(a.wsByConv, convID)
+	a.mu.Unlock()
+	return a.store.DeleteConversation(a.ctx, convID)
+}
+
+// ImportBundle restores a conversation from a bundle ZIP chosen via a
+// native open dialog. Returns nil when the dialog is cancelled. On ID
+// collision the import is refused and the error names the existing
+// conversation.
+func (a *App) ImportBundle() (*transcript.Conversation, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Import a conversation bundle",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "AgentChat bundles (*.zip)", Pattern: "*.zip"},
+		},
+	})
+	if err != nil || path == "" {
+		return nil, err
+	}
+	conv, ws, err := export.Import(a.ctx, a.store, a.lib, a.mgr, path)
+	if err != nil {
+		return nil, err
+	}
+	if ws != nil {
+		a.mu.Lock()
+		a.wsByConv[conv.ID] = ws
+		a.mu.Unlock()
+	}
+	return conv, nil
+}
+
 // PickRepoDirectory opens a native directory chooser and returns the
 // selected path ("" if cancelled).
 func (a *App) PickRepoDirectory() (string, error) {

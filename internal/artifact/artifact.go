@@ -258,6 +258,88 @@ func (l *Library) List(ctx context.Context, conversationID string) ([]*Artifact,
 	return out, nil
 }
 
+// ExportRecord returns the raw index-record bytes for an artifact, for
+// byte-identical round trips through export bundles.
+func (l *Library) ExportRecord(ctx context.Context, id string) ([]byte, error) {
+	b, err := os.ReadFile(l.recordPath(id))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("%w: %q", ErrNotFound, id)
+	}
+	return b, err
+}
+
+// RestoreRecord re-creates an artifact from raw index-record bytes (as
+// produced by ExportRecord). If a record with the same ID already exists
+// it is left untouched (content is identical by construction) and false
+// is returned. For file-kind artifacts blob supplies the content, which
+// must hash to the record's SHA-256; it may be nil when the blob is
+// already in the CAS (records sharing content dedupe naturally).
+func (l *Library) RestoreRecord(ctx context.Context, raw []byte, blob io.Reader) (*Artifact, bool, error) {
+	var a Artifact
+	if err := unmarshal(raw, &a); err != nil {
+		return nil, false, fmt.Errorf("artifact: restore: parsing record: %w", err)
+	}
+	if a.ID == "" || strings.ContainsAny(a.ID, "/\\") {
+		return nil, false, fmt.Errorf("artifact: restore: invalid record id %q", a.ID)
+	}
+	if a.Kind != KindFile && a.Kind != KindLink {
+		return nil, false, fmt.Errorf("artifact: restore: unknown kind %q", a.Kind)
+	}
+	if a.Kind == KindFile && a.SHA256 == "" {
+		return nil, false, fmt.Errorf("artifact: restore: file record %q has no sha256", a.ID)
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if _, err := os.Stat(l.recordPath(a.ID)); err == nil {
+		return &a, false, nil
+	}
+
+	if a.Kind == KindFile {
+		if _, err := os.Stat(l.blobPath(a.SHA256)); errors.Is(err, os.ErrNotExist) {
+			if blob == nil {
+				return nil, false, fmt.Errorf("artifact: restore: %q needs blob %s but none was supplied", a.ID, a.SHA256)
+			}
+			tmp, err := os.CreateTemp(filepath.Join(l.root, "cas"), "incoming-*")
+			if err != nil {
+				return nil, false, err
+			}
+			tmpPath := tmp.Name()
+			defer os.Remove(tmpPath)
+			h := sha256.New()
+			if _, err := io.Copy(io.MultiWriter(tmp, h), blob); err != nil {
+				tmp.Close()
+				return nil, false, fmt.Errorf("artifact: restore: reading blob: %w", err)
+			}
+			if err := tmp.Close(); err != nil {
+				return nil, false, err
+			}
+			if sum := hex.EncodeToString(h.Sum(nil)); sum != a.SHA256 {
+				return nil, false, fmt.Errorf("artifact: restore: blob for %q hashes to %s, record says %s", a.ID, sum, a.SHA256)
+			}
+			dst := l.blobPath(a.SHA256)
+			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+				return nil, false, err
+			}
+			if err := os.Rename(tmpPath, dst); err != nil {
+				return nil, false, err
+			}
+		}
+	}
+
+	// Write the raw bytes verbatim so the restored record is
+	// byte-identical to the exported one.
+	tmp := l.recordPath(a.ID) + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+		return nil, false, err
+	}
+	if err := os.Rename(tmp, l.recordPath(a.ID)); err != nil {
+		return nil, false, err
+	}
+	return &a, true, nil
+}
+
 // Delete removes an artifact record. A file blob is garbage-collected when
 // no remaining record references its hash.
 func (l *Library) Delete(ctx context.Context, id string) error {

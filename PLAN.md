@@ -201,51 +201,34 @@ in a compiling state**.
   execCommand fallback, toast on success/failure). CLI: `-export-turn
   <seq>` with -conv prints one turn's markdown to stdout.
 
-- [ ] **Step 15 — Bundle import (round-trippable bundles + conversation
-  delete).** Users can import a previously exported bundle — their own or
-  one shared by another user.
-  - Extend `export.Bundle` to be machine-readable, keeping the current
-    human-readable contents: add `bundle.json` (format version, app
-    version, conversation ID/title, export time) and `data/` containing
-    the raw store subtree for the conversation (conversation.json +
-    turns/<seq>-<id>/{turn.json,events.jsonl}) plus `data/artifacts/`
-    with the conversation's artifact index records (blob content is
-    already under artifacts/ in the bundle; links stay links).
-    transcript.md remains the human view. Bump nothing for old bundles:
-    Import rejects bundles without bundle.json with a clear "this bundle
-    predates import support; re-export it" error.
-  - `export.Import(ctx, store, lib, mgr, bundlePath)`:
-    - **Collision rule: if the conversation ID already exists in the
-      store, refuse and change nothing** (error names the existing
-      conversation and its title). No merge, no overwrite. (A
-      "duplicate as new conversation" option can come later; out of
-      scope now.)
-    - If the ID is absent (e.g. the user deleted the conversation),
-      restore: copy the data/ subtree into the store, re-create artifact
-      records (skip records whose ID already exists — content is
-      identical; file blobs naturally dedupe by hash in the CAS), and if
-      workspace.zip is present, materialize it into a fresh scratch
-      workspace (git init + initial commit of the imported tree; the
-      original snapshot refs are not recoverable from a git archive, so
-      turn SnapshotIDs from before the export remain historical
-      references — note this in the imported conversation via a link
-      artifact or bundle.json note). Associate the new workspace so the
-      next turn continues from the imported tree.
-  - Conversation deletion (prerequisite for the re-import flow):
-    `Store.DeleteConversation(ctx, id)` on the interface + FSStore
-    (removes the conversation subtree; artifacts are NOT deleted — they
-    may be shared/exported; a later step can add orphan cleanup), App
-    binding + a delete action in the sidebar with a confirm step, CLI
-    `-delete-conv <id>`.
-  - GUI: "Import bundle" button (native open dialog) in the sidebar;
-    on success select the imported conversation; on collision show the
-    refusal message.
-  - CLI: `-import-bundle <file>`.
-  - Tests: export → delete → import round trip (turns, events, artifacts
-    byte-identical; workspace tree restored and usable for a next turn);
-    import with existing ID → error and store untouched (assert
-    conversation.json mtime/content unchanged); old-format bundle →
-    clear rejection; artifact blob dedupe on import.
+- [x] **Step 15 — Bundle import (round-trippable bundles + conversation
+  delete).** Bundles now carry `bundle.json` (format 1, conversation
+  ID/title, export time, bundled snapshot), `data/conversation/` (the
+  raw store subtree, copied verbatim via FSStore.ConversationDir), and
+  `data/artifacts/` (raw index records via Library.ExportRecord); the
+  store subtree lives under data/conversation/ rather than data/ itself
+  so store files and artifact records can't collide. transcript.md and
+  artifacts/ stay the human view. `export.Import(ctx, store, lib, mgr,
+  path)`: refuses missing-bundle.json bundles ("predates import
+  support"), newer formats, and — changing nothing — ID collisions
+  (error names the existing conversation's title); otherwise restores
+  the subtree byte-identically (FSStore.ImportConversation, path-safety
+  checked, half-imports rolled back), re-creates artifact records
+  (Library.RestoreRecord skips existing IDs, verifies blob hashes,
+  dedupes blobs in the CAS), and materializes workspace.zip into a
+  fresh scratch workspace pinned by an initial snapshot + recorded as
+  an origin-"import" link artifact (old turn SnapshotIDs remain
+  historical references; durable re-association can use Step 17's
+  promotion). Deletion prerequisite: Store.DeleteConversation (FSStore:
+  removes the subtree, keeps artifacts), App binding + two-click
+  confirm delete in the sidebar, CLI `-delete-conv`. GUI "Import"
+  button (native dialog, selects the imported conversation, surfaces
+  refusals as toasts); CLI `-import-bundle`. Tests: export → delete →
+  import round trip (byte-identical subtree, surviving artifacts, echo
+  turn runs in the restored workspace), fresh-machine import (records
+  re-created, identical content → one CAS blob), collision refusal
+  (store byte-untouched), old-bundle rejection. Verified on real data
+  via the CLI.
 
 - [ ] **Step 16 — Sidebar project groups & creation picker.** Make project
   grouping first-class in the UI (Firefox-tab-group interaction model).

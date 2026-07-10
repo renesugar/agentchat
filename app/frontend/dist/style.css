@@ -97,19 +97,37 @@ button:disabled { opacity: 0.45; cursor: default; }
   white-space: nowrap;
 }
 #conversations .conv {
+  position: relative;
   display: block;
   width: 100%;
   text-align: left;
   background: none;
   border: 0;
   border-radius: 6px;
-  padding: 7px 9px;
+  padding: 7px 26px 7px 9px;
   margin: 1px 0;
   color: var(--text);
+  cursor: pointer;
 }
 #conversations .conv:hover { background: var(--panel-2); }
 #conversations .conv.active { background: var(--panel-2); }
 #conversations .conv .when { display: block; color: var(--muted); font: 11px var(--mono); }
+#conversations .conv .del-conv {
+  visibility: hidden;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 0 5px;
+  font: 400 12px var(--mono);
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#conversations .conv:hover .del-conv { visibility: visible; }
+#conversations .conv .del-conv:hover { color: var(--text); border-color: var(--line); }
+#conversations .conv .del-conv.arm { color: #e08a8a; border-color: #e08a8a; visibility: visible; }
 
 #adapter-status {
   border-top: 1px solid var(--line);

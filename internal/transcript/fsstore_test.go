@@ -3,6 +3,10 @@ package transcript_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/example/agentchat/internal/adapter"
@@ -47,6 +51,102 @@ func TestConversationRoundTrip(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].ID != c.ID {
 		t.Fatalf("ListConversations = %v, %v", list, err)
 	}
+}
+
+func TestDeleteAndImportConversation(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+
+	c, err := s.CreateConversation(ctx, transcript.NewConversation{Title: "doomed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	turn, err := s.BeginTurn(ctx, c.ID, transcript.NewTurn{Client: "echo", Prompt: "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AppendEvent(ctx, c.ID, turn.ID, adapter.Event{Kind: adapter.EventText, Text: "yo"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.FinishTurn(ctx, c.ID, turn.ID, &adapter.Result{ExitCode: 0}, "", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Importing over an existing conversation is refused.
+	if err := s.ImportConversation(ctx, c.ID, os.DirFS(s.ConversationDir(c.ID))); err == nil {
+		t.Fatal("import over existing conversation succeeded")
+	}
+
+	// Capture the raw subtree, delete, and restore it byte-identically.
+	snapshot := readTree(t, s.ConversationDir(c.ID))
+	if err := s.DeleteConversation(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetConversation(ctx, c.ID); !errors.Is(err, transcript.ErrNotFound) {
+		t.Fatalf("after delete err = %v, want ErrNotFound", err)
+	}
+	if err := s.DeleteConversation(ctx, c.ID); !errors.Is(err, transcript.ErrNotFound) {
+		t.Fatalf("double delete err = %v, want ErrNotFound", err)
+	}
+
+	src := t.TempDir()
+	for rel, content := range snapshot {
+		path := filepath.Join(src, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.ImportConversation(ctx, c.ID, os.DirFS(src)); err != nil {
+		t.Fatal(err)
+	}
+	if got := readTree(t, s.ConversationDir(c.ID)); !reflect.DeepEqual(got, snapshot) {
+		t.Fatalf("restored subtree differs:\n got %v\nwant %v", keysOf(got), keysOf(snapshot))
+	}
+
+	// A mismatched ID is refused and leaves nothing behind.
+	if err := s.ImportConversation(ctx, "other-id", os.DirFS(src)); err == nil {
+		t.Fatal("import with mismatched id succeeded")
+	}
+	if _, err := os.Stat(s.ConversationDir("other-id")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("failed import left a partial conversation dir")
+	}
+}
+
+// readTree maps relative path -> content for every regular file under root.
+func readTree(t *testing.T, root string) map[string][]byte {
+	t.Helper()
+	out := map[string][]byte{}
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		out[rel] = b
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func keysOf(m map[string][]byte) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func TestTurnLifecycle(t *testing.T) {

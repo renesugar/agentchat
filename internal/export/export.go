@@ -13,11 +13,13 @@ package export
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/example/agentchat/internal/adapter"
 	"github.com/example/agentchat/internal/artifact"
@@ -174,11 +176,39 @@ func TurnMarkdown(t *transcript.Turn, events []adapter.Event) []byte {
 	return []byte(b.String())
 }
 
-// Bundle writes a ZIP at outPath containing transcript.md, the
-// conversation's stored file artifacts under artifacts/ (link artifacts
-// are listed in artifacts/links.md), and — when ws is non-nil and has at
-// least one snapshot — workspace.zip with the latest snapshot's tree.
+// bundleFormat versions the machine-readable bundle layout consumed by
+// Import. Bump only for incompatible changes.
+const bundleFormat = 1
+
+// BundleInfo is bundle.json: what identifies a bundle to Import.
+type BundleInfo struct {
+	Format         int       `json:"format"`
+	App            string    `json:"app"`
+	ConversationID string    `json:"conversation_id"`
+	Title          string    `json:"title"`
+	ExportedAt     time.Time `json:"exported_at"`
+	// Snapshot is the workspace snapshot commit whose tree is in
+	// workspace.zip ("" when no workspace was bundled). The snapshot
+	// REFS are not recoverable from the archive, so turn SnapshotIDs
+	// from before the export remain historical references after import.
+	Snapshot string `json:"snapshot,omitempty"`
+}
+
+// Bundle writes a ZIP at outPath containing:
+//
+//	transcript.md          the human-readable view
+//	bundle.json            format/conversation metadata (see BundleInfo)
+//	data/conversation/     the raw store subtree, copied verbatim
+//	data/artifacts/        the conversation's artifact index records
+//	artifacts/             stored file artifacts (links in links.md)
+//	workspace.zip/.txt     latest snapshot tree, when ws is non-nil
+//
+// bundle.json + data/ make the bundle round-trippable through Import.
 func (e *Exporter) Bundle(ctx context.Context, convID string, ws *workspace.Workspace, outPath string) error {
+	conv, err := e.Store.GetConversation(ctx, convID)
+	if err != nil {
+		return err
+	}
 	md, err := e.Markdown(ctx, convID)
 	if err != nil {
 		return err
@@ -197,6 +227,46 @@ func (e *Exporter) Bundle(ctx context.Context, convID string, ws *workspace.Work
 		return err
 	}
 
+	snap := ""
+	if ws != nil {
+		snap = ws.LatestSnapshot(ctx)
+	}
+	info, err := json.MarshalIndent(BundleInfo{
+		Format:         bundleFormat,
+		App:            "agentchat",
+		ConversationID: conv.ID,
+		Title:          conv.Title,
+		ExportedAt:     time.Now().UTC(),
+		Snapshot:       snap,
+	}, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := writeZipFile(zw, "bundle.json", append(info, '\n')); err != nil {
+		return err
+	}
+
+	// The raw store subtree, verbatim, so Import restores it
+	// byte-identically. Every concrete store is an FSStore; a store
+	// without a directory layout would simply produce a bundle that
+	// Import rejects for missing data.
+	if cd, ok := e.Store.(interface{ ConversationDir(string) string }); ok {
+		root := cd.ConversationDir(convID)
+		err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !d.Type().IsRegular() {
+				return err
+			}
+			rel, err := filepath.Rel(root, p)
+			if err != nil {
+				return err
+			}
+			return copyIntoZip(zw, "data/conversation/"+filepath.ToSlash(rel), p)
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	if e.Library != nil {
 		arts, err := e.Library.List(ctx, convID)
 		if err != nil {
@@ -204,6 +274,13 @@ func (e *Exporter) Bundle(ctx context.Context, convID string, ws *workspace.Work
 		}
 		var links strings.Builder
 		for _, a := range arts {
+			rec, err := e.Library.ExportRecord(ctx, a.ID)
+			if err != nil {
+				return err
+			}
+			if err := writeZipFile(zw, "data/artifacts/"+a.ID+".json", rec); err != nil {
+				return err
+			}
 			switch a.Kind {
 			case artifact.KindFile:
 				blob, err := e.Library.BlobPath(ctx, a.ID)
@@ -230,7 +307,7 @@ func (e *Exporter) Bundle(ctx context.Context, convID string, ws *workspace.Work
 	}
 
 	if ws != nil {
-		if snap := ws.LatestSnapshot(ctx); snap != "" {
+		if snap != "" {
 			tmp, err := os.CreateTemp("", "agentchat-wszip-*.zip")
 			if err != nil {
 				return err

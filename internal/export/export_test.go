@@ -8,12 +8,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/example/agentchat/internal/adapter"
+	"github.com/example/agentchat/internal/adapters/echo"
 	"github.com/example/agentchat/internal/artifact"
+	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -240,6 +243,252 @@ func TestBundle(t *testing.T) {
 	if !found {
 		t.Fatal("workspace.zip missing hello.py")
 	}
+}
+
+// TestBundleImportRoundTrip is the Step 15 contract: export → delete →
+// import restores the conversation byte-identically, artifacts survive,
+// and the bundled workspace tree is materialized and usable for a next
+// turn.
+func TestBundleImportRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	store, lib, convID := buildFixtureConversation(t)
+
+	mgr, err := workspace.NewManager(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws, err := mgr.CreateScratch(ctx, "roundtrip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws.Dir, "hello.py"), []byte("print('hi')\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ws.Snapshot(ctx, "turn 1"); err != nil {
+		t.Fatal(err)
+	}
+
+	ex := &Exporter{Store: store, Library: lib}
+	bundlePath := filepath.Join(t.TempDir(), "bundle.zip")
+	if err := ex.Bundle(ctx, convID, ws, bundlePath); err != nil {
+		t.Fatal(err)
+	}
+
+	origTree := readDirTree(t, store.ConversationDir(convID))
+	origArts, err := lib.List(ctx, convID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	origRecords := map[string][]byte{}
+	for _, a := range origArts {
+		rec, err := lib.ExportRecord(ctx, a.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		origRecords[a.ID] = rec
+	}
+
+	if err := store.DeleteConversation(ctx, convID); err != nil {
+		t.Fatal(err)
+	}
+
+	conv, restoredWS, err := Import(ctx, store, lib, mgr, bundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conv.ID != convID {
+		t.Fatalf("imported conversation id = %q, want %q", conv.ID, convID)
+	}
+
+	// Store subtree restored byte-identically.
+	if got := readDirTree(t, store.ConversationDir(convID)); !reflect.DeepEqual(got, origTree) {
+		t.Fatalf("restored subtree differs from original")
+	}
+	// Artifact records untouched/byte-identical (they survive deletion,
+	// so import skips them).
+	for id, orig := range origRecords {
+		got, err := lib.ExportRecord(ctx, id)
+		if err != nil {
+			t.Fatalf("artifact %s gone after import: %v", id, err)
+		}
+		if !reflect.DeepEqual(got, orig) {
+			t.Errorf("artifact record %s changed across round trip", id)
+		}
+	}
+
+	// Workspace materialized with the snapshot tree, usable for a next
+	// turn (a real echo turn runs and snapshots in it).
+	if restoredWS == nil {
+		t.Fatal("import returned no workspace despite workspace.zip")
+	}
+	if b, err := os.ReadFile(filepath.Join(restoredWS.Dir, "hello.py")); err != nil || string(b) != "print('hi')\n" {
+		t.Fatalf("restored workspace tree: %q, %v", b, err)
+	}
+	reg := adapter.NewRegistry()
+	reg.Register(echo.New())
+	eng := engine.New(reg, store)
+	turn, err := eng.RunTurn(ctx, convID, "echo", restoredWS, adapter.TurnRequest{Prompt: "continue"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if turn.Seq != 3 || turn.SnapshotID == "" {
+		t.Fatalf("next turn after import: seq=%d snapshot=%q", turn.Seq, turn.SnapshotID)
+	}
+
+	// The imported-workspace link artifact records the new location.
+	arts, err := lib.List(ctx, convID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, a := range arts {
+		if a.Origin == "import" && a.LocalPath == restoredWS.Dir {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("no imported-workspace link artifact recorded")
+	}
+}
+
+// TestImportFreshMachine imports a bundle into empty store/library/manager
+// (another user's machine): everything is re-created, and file artifacts
+// sharing content land as ONE blob in the CAS.
+func TestImportFreshMachine(t *testing.T) {
+	ctx := context.Background()
+	store, lib, convID := buildFixtureConversation(t)
+
+	// A second file artifact with identical content, to observe dedupe.
+	if _, err := lib.AddFile(ctx, "notes-copy.md", strings.NewReader("remember the docstring\n"),
+		artifact.Meta{ConversationID: convID, Origin: "user-upload"}); err != nil {
+		t.Fatal(err)
+	}
+
+	ex := &Exporter{Store: store, Library: lib}
+	bundlePath := filepath.Join(t.TempDir(), "bundle.zip")
+	if err := ex.Bundle(ctx, convID, nil, bundlePath); err != nil {
+		t.Fatal(err)
+	}
+
+	freshStore, err := transcript.NewFSStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshLib, err := artifact.NewLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	conv, ws, err := Import(ctx, freshStore, freshLib, nil, bundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws != nil {
+		t.Fatal("workspace returned despite bundling without one")
+	}
+	if conv.Title != "Fix the greeting" {
+		t.Fatalf("imported title = %q", conv.Title)
+	}
+
+	// Turns and events byte-identical to the source store.
+	if got, want := readDirTree(t, freshStore.ConversationDir(convID)), readDirTree(t, store.ConversationDir(convID)); !reflect.DeepEqual(got, want) {
+		t.Fatal("imported subtree differs from source store")
+	}
+
+	// All three artifact records restored; the two identical files share
+	// one CAS blob.
+	arts, err := freshLib.List(ctx, convID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(arts) != 3 {
+		t.Fatalf("restored %d artifacts, want 3", len(arts))
+	}
+	blobs := 0
+	err = filepath.WalkDir(filepath.Join(freshLib.Root(), "cas"), func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			blobs++
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blobs != 1 {
+		t.Fatalf("CAS has %d blobs, want 1 (dedupe)", blobs)
+	}
+}
+
+func TestImportCollision(t *testing.T) {
+	ctx := context.Background()
+	store, lib, convID := buildFixtureConversation(t)
+	ex := &Exporter{Store: store, Library: lib}
+	bundlePath := filepath.Join(t.TempDir(), "bundle.zip")
+	if err := ex.Bundle(ctx, convID, nil, bundlePath); err != nil {
+		t.Fatal(err)
+	}
+
+	before := readDirTree(t, store.ConversationDir(convID))
+	_, _, err := Import(ctx, store, lib, nil, bundlePath)
+	if err == nil {
+		t.Fatal("import over existing conversation succeeded")
+	}
+	if !strings.Contains(err.Error(), "Fix the greeting") {
+		t.Errorf("collision error should name the existing conversation: %v", err)
+	}
+	if got := readDirTree(t, store.ConversationDir(convID)); !reflect.DeepEqual(got, before) {
+		t.Error("store changed on refused import")
+	}
+}
+
+func TestImportOldBundle(t *testing.T) {
+	// A pre-Step-15 bundle: transcript.md but no bundle.json.
+	path := filepath.Join(t.TempDir(), "old.zip")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	if err := writeZipFile(zw, "transcript.md", []byte("# old\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	store, err := transcript.NewFSStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = Import(context.Background(), store, nil, nil, path)
+	if err == nil || !strings.Contains(err.Error(), "predates import support") {
+		t.Fatalf("old bundle err = %v, want a clear rejection", err)
+	}
+}
+
+// readDirTree maps relative path -> content for every file under root.
+func readDirTree(t *testing.T, root string) map[string][]byte {
+	t.Helper()
+	out := map[string][]byte{}
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		out[rel] = b
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 func keys(m map[string]*zip.File) []string {

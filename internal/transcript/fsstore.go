@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -246,6 +249,88 @@ func (s *FSStore) Events(ctx context.Context, convID, turnID string) ([]adapter.
 		out = append(out, e)
 	}
 	return out, sc.Err()
+}
+
+// DeleteConversation implements Store.
+func (s *FSStore) DeleteConversation(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := s.GetConversation(ctx, id); err != nil {
+		return err
+	}
+	return os.RemoveAll(s.convDir(id))
+}
+
+// ConversationDir returns the on-disk directory holding a conversation's
+// raw store subtree (conversation.json + turns/...). Used by export to
+// bundle the subtree verbatim; treat the contents as read-only.
+func (s *FSStore) ConversationDir(id string) string { return s.convDir(id) }
+
+// ImportConversation restores a conversation subtree captured by export:
+// src must contain conversation.json (whose "id" matches id) plus the
+// turns/ tree, and the conversation must not already exist. Files are
+// copied verbatim so a re-imported conversation is byte-identical to the
+// exported one.
+func (s *FSStore) ImportConversation(ctx context.Context, id string, src fs.FS) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, err := s.GetConversation(ctx, id); err == nil {
+		return fmt.Errorf("transcript: conversation %q already exists", id)
+	} else if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+
+	// The subtree must at least identify itself correctly.
+	b, err := fs.ReadFile(src, "conversation.json")
+	if err != nil {
+		return fmt.Errorf("transcript: import: %w", err)
+	}
+	var c Conversation
+	if err := json.Unmarshal(b, &c); err != nil {
+		return fmt.Errorf("transcript: import: parsing conversation.json: %w", err)
+	}
+	if c.ID != id {
+		return fmt.Errorf("transcript: import: conversation.json has id %q, want %q", c.ID, id)
+	}
+
+	dst := s.convDir(id)
+	err = fs.WalkDir(src, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !fs.ValidPath(path) {
+			return fmt.Errorf("transcript: import: unsafe path %q", path)
+		}
+		target := filepath.Join(dst, filepath.FromSlash(path))
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if !d.Type().IsRegular() {
+			return nil // ignore anything exotic in the archive
+		}
+		in, err := src.Open(path)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		out, err := os.Create(target)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(out, in); err != nil {
+			out.Close()
+			return err
+		}
+		return out.Close()
+	})
+	if err != nil {
+		// Leave no half-imported conversation behind.
+		_ = os.RemoveAll(dst)
+		return err
+	}
+	return nil
 }
 
 // --- internals ---
