@@ -53,10 +53,9 @@ func (a *Adapter) Available(ctx context.Context) error {
 // user's Codex install passes through; these are common defaults.
 func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 	// Current codex model lineup (verified against a live codex-cli
-	// 0.142.5 environment, 2026-07-10). Installs configured for a local
-	// OSS provider (e.g. Ollama) should replace this list via
-	// config.json: clients.codex.models + replace_models (see
-	// docs/config.example.json); any other ID passes through too.
+	// 0.142.5 environment, 2026-07-10). Differently configured installs
+	// can replace this list via config.json (clients.codex.models +
+	// replace_models); any other ID passes through as-is.
 	return []adapter.Model{
 		{ID: "", Label: "Default (client-configured)"},
 		{ID: "gpt-5.6-sol", Label: "GPT-5.6 Sol (most capable)"},

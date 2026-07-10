@@ -16,7 +16,7 @@ import (
 
 // Model is one model a client can be asked to use.
 type Model struct {
-	// ID is the value passed to the client (e.g. "gpt-5-codex",
+	// ID is the value passed to the client (e.g. "gpt-5.6-sol",
 	// "claude-sonnet-4-6", or an OpenAI-compatible provider/model ref).
 	ID string `json:"id"`
 	// Label is the human-readable name shown in the UI; defaults to ID.

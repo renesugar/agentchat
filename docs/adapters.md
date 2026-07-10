@@ -54,9 +54,12 @@ and update this file in the same commit.
   environment — gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna / gpt-5.5 /
   gpt-5.4 / gpt-5.4-mini (the earlier gpt-5-codex / gpt-5 IDs are gone
   and error now). Which IDs actually work still depends on the codex
-  configuration: installs pointed at a local OSS provider (e.g. Ollama)
-  should replace the list via config.json `clients.codex.models` +
-  `replace_models` (recipe in docs/config.example.json).
+  configuration; differently configured installs can replace the list
+  via config.json `clients.codex.models` + `replace_models`.
+- AgentChat NEVER writes codex configuration files (~/.codex/*): all
+  per-turn settings (sandbox, model_reasoning_effort, the MCP callback
+  server) go through `-c key=value` command-line overrides, which codex
+  applies to that invocation only and does not persist.
 - JSONL events handled: `thread.started`/`thread.resumed` (thread_id →
   session for resume), `turn.started`, `turn.completed` (usage: input +
   cached_input → InputTokens, output → OutputTokens), `turn.failed`
