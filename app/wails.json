@@ -2,10 +2,11 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "agentchat",
   "outputfilename": "agentchat",
+  "assetdir": "frontend/dist",
   "frontend:install": "",
   "frontend:build": "",
   "frontend:dev:watcher": "",
-  "frontend:dev:serverUrl": "auto",
+  "frontend:dev:serverUrl": "",
   "author": {
     "name": "AgentChat"
   }
