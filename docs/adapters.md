@@ -77,9 +77,40 @@ and update this file in the same commit.
   --help`, record the version, and sanity-check the noise-prefix list
   against real output (it varies slightly across versions).
 
-## swival — Step 6 ⚠ planned
-- Check https://swival.dev/ docs for the non-interactive/print mode and
-  model flags; record findings here with the version.
+## swival — Step 6 ✅ implemented (verified against swival.dev docs, not a live install)
+    swival [--quiet] [--profile P] [--provider P] [--base-url U] \
+        [--model M] [--reasoning-effort E] [--max-turns N] \
+        --report <tmpfile>        # task piped to stdin
+- Output contract (documented): stdout is exclusively the final answer;
+  diagnostics (turn headers, tool traces, timing) go to stderr; --report
+  writes a structured JSON run report (result.answer, stats, timeline of
+  llm_call/tool_call/compaction events). The task is piped to stdin —
+  documented one-shot behavior when no positional task is given.
+- Adapter mapping: stderr lines → thinking events (live progress; disable
+  with Extra["diagnostics"]="false", which also adds --quiet); stdout →
+  final text event; report → usage (stats token counters tried by several
+  names, falling back to summing timeline llm_call prompt_tokens_est +
+  cached_tokens — exact stats keys unpinned, so parsing is defensive) and
+  fallback answer.
+- File changes: swival does not auto-commit, so changes are detected by
+  diffing `git status --porcelain` before/after (best-effort; Step 7
+  workspace snapshots are the authoritative record). Pre-existing dirty
+  paths are excluded.
+- Provider selection via Extra: provider (lmstudio | llamacpp |
+  huggingface | openrouter | generic | google | chatgpt | bedrock |
+  command), base_url (e.g. a LocalAI endpoint with provider=generic),
+  profile, reasoning_effort, max_turns. API keys go through the
+  environment (HF_TOKEN, OPENROUTER_API_KEY, OPENAI_API_KEY, ...), never
+  the command line.
+- No session resume: continuity comes from .swival/ state (memory,
+  history) inside the workspace, which persists across turns under this
+  app's workspace model. SessionID is ignored.
+- Exit codes (documented): 0 success; 1 runtime/config failure; 2 turn
+  limit reached (adapter returns the partial answer plus an explicit
+  error); 130/143 signals.
+- TODO when a live `swival` is available: confirm flags with `swival
+  --help`, pin the version, and pin the report stats token-counter key
+  names (then simplify applyReport).
 
 ## echo (fake) — built in
     agentchat-cli -client echo -dir <workspace> "<prompt>"

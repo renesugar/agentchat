@@ -64,10 +64,15 @@ in a compiling state**.
   stub-binary tests against a real temp git repo. No session IDs —
   continuity via aider's history files (see docs/adapters.md).
 
-- [ ] **Step 6 — Swival adapter.** `internal/adapters/swival`. Check
-  swival's non-interactive/print mode and model flags from its docs/help
-  at implementation time; record findings in `docs/adapters.md`. Fixture
-  tests.
+- [x] **Step 6 — Swival adapter.** `internal/adapters/swival`. One-shot
+  mode with the task on stdin and `--report <tmpfile>`; stdout (the final
+  answer, per swival's contract) → text event, stderr diagnostics →
+  thinking events, report JSON → usage + fallback answer; file changes
+  from a `git status --porcelain` before/after diff; documented exit
+  codes handled (2 = turn limit → partial result + explicit error).
+  Provider/base-url/profile via Extra. Report-fixture, porcelain-diff,
+  and stub-binary tests. Details and live-install TODOs in
+  docs/adapters.md.
 
 - [ ] **Step 7 — Workspace manager.** `internal/workspace`. Workspace kinds:
   `repo` (existing local git repo), `worktree` (created per conversation
