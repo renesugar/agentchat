@@ -40,7 +40,13 @@
       ]
     },
     "codex": {
-      "extra": { "sandbox": "workspace-write" }
+      "extra": { "sandbox": "workspace-write" },
+      "replace_models": true,
+      "models": [
+        { "id": "", "label": "Default (client-configured)" },
+        { "id": "qwen2.5-coder:1.5b", "label": "Qwen2.5 Coder 1.5B (Ollama)" },
+        { "id": "deepseek-coder-v2:16b", "label": "DeepSeek Coder V2 16B (Ollama)" }
+      ]
     }
   }
 }

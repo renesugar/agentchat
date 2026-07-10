@@ -50,6 +50,13 @@ and update this file in the same commit.
     codex exec --json --sandbox workspace-write --skip-git-repo-check \
         [--model <id>] [resume <thread_id>] -
 - Prompt is piped to stdin (the trailing `-`), avoiding quoting issues.
+- Models: built-in list refreshed 2026-07-10 against a live codex
+  environment — gpt-5.6-sol / gpt-5.6-terra / gpt-5.6-luna / gpt-5.5 /
+  gpt-5.4 / gpt-5.4-mini (the earlier gpt-5-codex / gpt-5 IDs are gone
+  and error now). Which IDs actually work still depends on the codex
+  configuration: installs pointed at a local OSS provider (e.g. Ollama)
+  should replace the list via config.json `clients.codex.models` +
+  `replace_models` (recipe in docs/config.example.json).
 - JSONL events handled: `thread.started`/`thread.resumed` (thread_id →
   session for resume), `turn.started`, `turn.completed` (usage: input +
   cached_input → InputTokens, output → OutputTokens), `turn.failed`
