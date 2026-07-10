@@ -53,6 +53,41 @@ func TestConversationRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSetConversationProject(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+
+	c, err := s.CreateConversation(ctx, transcript.NewConversation{Title: "wanderer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := c.UpdatedAt
+
+	got, err := s.SetConversationProject(ctx, c.ID, "/home/u/proj")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ProjectPath != "/home/u/proj" {
+		t.Fatalf("ProjectPath = %q", got.ProjectPath)
+	}
+	if !got.UpdatedAt.After(before) && !got.UpdatedAt.Equal(before) {
+		t.Fatalf("UpdatedAt went backwards: %v -> %v", before, got.UpdatedAt)
+	}
+	// The change persists.
+	if re, err := s.GetConversation(ctx, c.ID); err != nil || re.ProjectPath != "/home/u/proj" {
+		t.Fatalf("reloaded = %+v, %v", re, err)
+	}
+
+	// Empty path detaches.
+	if got, err = s.SetConversationProject(ctx, c.ID, ""); err != nil || got.ProjectPath != "" {
+		t.Fatalf("detach = %+v, %v", got, err)
+	}
+
+	if _, err := s.SetConversationProject(ctx, "missing", "/x"); !errors.Is(err, transcript.ErrNotFound) {
+		t.Fatalf("missing conversation err = %v, want ErrNotFound", err)
+	}
+}
+
 func TestDeleteAndImportConversation(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)

@@ -246,39 +246,32 @@ in a compiling state**.
   dedupe/counts/scratch-exclusion/label edge cases; frontend exercised
   on a real machine per the Step 10 caveat.
 
-- [ ] **Step 17 — Promote conversation to project & move between
-  projects.** A scratch conversation can become a project; conversations
-  can be re-associated with existing projects.
-  - Store: add `SetConversationProject(ctx, id, projectPath string)` to
-    the Store interface + FSStore (updates conversation.json, bumps
-    UpdatedAt; empty path detaches). Tests.
-  - Workspace: `Manager.PromoteScratch(ctx, ws, targetDir)` — relocate a
-    scratch workspace to a user-chosen directory as the project repo.
-    Requirements: targetDir must not exist (or be empty); move the whole
-    directory INCLUDING .git — a plain directory move, not `git clone`,
-    so the refs/agentchat snapshot chain and turn SnapshotIDs stay valid
-    (rename when same filesystem, copy+verify+remove across
-    filesystems); returned workspace has Kind repo and the new Dir.
-    Refuse for non-scratch kinds. Test asserts snapshot refs and
-    Diff(oldSnapshotID, ...) still work in the new location.
-  - App bindings + GUI:
-    - "Create project from this conversation…" action on a scratch
-      conversation (native directory save dialog → PromoteScratch →
-      SetConversationProject → refresh workspace cache and sidebar; the
-      conversation now appears under its new project group, and the new
-      project is offered in the Step 16 creation picker).
-    - "Move to project…" on any conversation (choose from Projects() or
-      pick a repo): calls SetConversationProject only; future turns
-      resolve to the project repo via workspaceFor (which already
-      prefers ProjectPath) — prior turns keep their historical
-      WorkspaceRefs/SnapshotIDs untouched. If the conversation had a
-      scratch workspace, it is left in place as history (a later cleanup
-      step may offer removal).
-  - CLI: `-set-project <path>` and `-promote <targetDir>` with `-conv`.
-  - Update ARCHITECTURE.md workspace-kind notes to describe promotion.
-  - Tests: store update round trip; promote preserves snapshots; moving
-    a conversation changes grouping and future workspace resolution
-    (engine test: next turn runs in the project repo).
+- [x] **Step 17 — Promote conversation to project & move between
+  projects.** Store: `SetConversationProject(ctx, id, path)` on the
+  interface + FSStore (updates conversation.json, bumps UpdatedAt;
+  empty detaches). Workspace: `Manager.PromoteScratch(ctx, ws, target)`
+  moves the whole directory INCLUDING .git (rename; across filesystems
+  copy + verify the snapshot refs in the copy + remove source), refuses
+  non-scratch kinds and non-empty targets (an existing empty dir is
+  fine), returns a Kind-repo workspace at the new Dir; plus
+  `Manager.OpenScratch(dir)` so a reopened scratch (app restart, CLI)
+  keeps its scratch identity — only dirs under the manager's scratch
+  root qualify, so user repos never gain owned-workspace rights. App:
+  `PromoteConversation` (save dialog → PromoteScratch →
+  SetConversationProject → cache refresh; refused mid-turn) and
+  `MoveConversation` (association only; validates the repo; past turns
+  keep historical refs; an old scratch stays on disk as history);
+  workspaceFor now reopens managed scratch dirs via OpenScratch. GUI:
+  "Make project…" (scratch conversations) and "Move…" (picker: scratch /
+  known projects / other repo) in the conversation header; sidebar
+  regrouping and the Step 16 creation picker follow automatically. CLI:
+  `-promote <newDir>` and `-set-project <path|->` with `-conv`.
+  ARCHITECTURE.md workspace-kind notes describe promotion. Tests: store
+  round trip, promote preserves snapshots + cross-snapshot diffs +
+  further snapshots chain on, copyTree (perms/symlinks), OpenScratch
+  acceptance/refusals, engine-level move (next turn runs in the project
+  repo, history untouched, Projects() grouping follows). Promote/move
+  also smoke-tested on real data via the CLI.
 
 ## Definition of done for any step
 

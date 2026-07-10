@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -151,6 +152,136 @@ func (m *Manager) CreateScratch(ctx context.Context, name string) (*Workspace, e
 		}
 	}
 	return &Workspace{Kind: KindScratch, Dir: dir}, nil
+}
+
+// OpenScratch reopens a scratch workspace by directory. Unlike OpenRepo it
+// returns KindScratch, but only for git-inited directories that actually
+// live under this manager's scratch root — anything else is refused, so a
+// reopened scratch keeps its owned-workspace privileges (Restore,
+// PromoteScratch) without ever granting them to a user repo.
+func (m *Manager) OpenScratch(ctx context.Context, dir string) (*Workspace, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	scratchRoot := filepath.Join(m.root, "scratch")
+	rel, err := filepath.Rel(scratchRoot, abs)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, fmt.Errorf("workspace: %s is not a managed scratch directory", abs)
+	}
+	if out, err := runGit(ctx, abs, nil, "rev-parse", "--is-inside-work-tree"); err != nil || strings.TrimSpace(out) != "true" {
+		return nil, fmt.Errorf("%w: %s", ErrNotARepo, abs)
+	}
+	return &Workspace{Kind: KindScratch, Dir: abs}, nil
+}
+
+// PromoteScratch relocates a scratch workspace to targetDir, turning it
+// into a project repo the user owns. The whole directory moves INCLUDING
+// .git — a plain move, not a clone — so the refs/agentchat snapshot chain
+// and the SnapshotIDs recorded on past turns stay valid. targetDir must
+// not exist yet (or be an empty directory). Same-filesystem moves are a
+// rename; across filesystems the tree is copied, the snapshot refs are
+// verified in the copy, and only then is the source removed. Non-scratch
+// workspaces are refused.
+func (m *Manager) PromoteScratch(ctx context.Context, ws *Workspace, targetDir string) (*Workspace, error) {
+	if ws.Kind != KindScratch {
+		return nil, fmt.Errorf("workspace: promote: %s is a %s workspace, not scratch", ws.Dir, ws.Kind)
+	}
+	target, err := filepath.Abs(targetDir)
+	if err != nil {
+		return nil, err
+	}
+	switch entries, err := os.ReadDir(target); {
+	case errors.Is(err, os.ErrNotExist):
+		// The good case: we create it by moving.
+	case err != nil:
+		return nil, fmt.Errorf("workspace: promote: %w", err)
+	case len(entries) > 0:
+		return nil, fmt.Errorf("workspace: promote: %s already exists and is not empty", target)
+	default:
+		// Exists but empty: move in its place.
+		if err := os.Remove(target); err != nil {
+			return nil, err
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return nil, err
+	}
+
+	// Fingerprint the snapshot refs before moving so a copy can be
+	// verified against them.
+	refs, err := runGit(ctx, ws.Dir, nil, "for-each-ref",
+		"--format=%(refname) %(objectname)", "refs/agentchat/snapshots/")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.Rename(ws.Dir, target); err != nil {
+		// Different filesystem (or anything rename can't do): copy,
+		// verify the refs survived, then remove the source.
+		if err := copyTree(ws.Dir, target); err != nil {
+			_ = os.RemoveAll(target)
+			return nil, fmt.Errorf("workspace: promote: copying: %w", err)
+		}
+		moved := &Workspace{Kind: KindRepo, Dir: target}
+		copiedRefs, err := runGit(ctx, moved.Dir, nil, "for-each-ref",
+			"--format=%(refname) %(objectname)", "refs/agentchat/snapshots/")
+		if err != nil || copiedRefs != refs {
+			_ = os.RemoveAll(target)
+			return nil, fmt.Errorf("workspace: promote: snapshot refs did not survive the copy (err=%v)", err)
+		}
+		if err := os.RemoveAll(ws.Dir); err != nil {
+			return nil, fmt.Errorf("workspace: promote: removing old scratch dir: %w", err)
+		}
+	}
+
+	return &Workspace{Kind: KindRepo, Dir: target}, nil
+}
+
+// copyTree copies a directory tree (dirs, regular files, symlinks),
+// preserving permissions. Used when promotion crosses filesystems.
+func copyTree(src, dst string) error {
+	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		switch {
+		case d.IsDir():
+			return os.MkdirAll(target, info.Mode().Perm())
+		case info.Mode()&os.ModeSymlink != 0:
+			link, err := os.Readlink(p)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(link, target)
+		case info.Mode().IsRegular():
+			in, err := os.Open(p)
+			if err != nil {
+				return err
+			}
+			defer in.Close()
+			out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(out, in); err != nil {
+				out.Close()
+				return err
+			}
+			return out.Close()
+		default:
+			return fmt.Errorf("unsupported file type at %s", p)
+		}
+	})
 }
 
 // Remove deletes an owned workspace (worktree or scratch). Repo workspaces

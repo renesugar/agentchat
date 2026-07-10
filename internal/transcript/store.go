@@ -40,6 +40,11 @@ type Store interface {
 	// events. Artifacts are NOT deleted — they may be shared or exported
 	// (orphan cleanup can come later). Unknown IDs return ErrNotFound.
 	DeleteConversation(ctx context.Context, id string) error
+
+	// SetConversationProject re-associates a conversation with a project
+	// (a repo path); empty detaches it back to scratch. Bumps UpdatedAt.
+	// Past turns keep their historical WorkspaceRefs/SnapshotIDs.
+	SetConversationProject(ctx context.Context, id, projectPath string) (*Conversation, error)
 }
 
 // newID returns a sortable, unique identifier: UTC timestamp + random hex.

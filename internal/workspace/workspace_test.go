@@ -264,3 +264,138 @@ func TestOpenRepoRejectsNonRepo(t *testing.T) {
 		t.Fatal("OpenRepo accepted a plain directory")
 	}
 }
+
+func TestOpenScratch(t *testing.T) {
+	ctx := ctxT(t)
+	m, _ := NewManager(t.TempDir())
+	ws, err := m.CreateScratch(ctx, "reopen me")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	re, err := m.OpenScratch(ctx, ws.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if re.Kind != KindScratch || re.Dir != ws.Dir {
+		t.Fatalf("reopened = %+v", re)
+	}
+
+	// Directories outside the scratch root are refused, git repo or not.
+	if _, err := m.OpenScratch(ctx, newUserRepo(t)); err == nil {
+		t.Fatal("OpenScratch accepted a user repo")
+	}
+	if _, err := m.OpenScratch(ctx, filepath.Join(m.root, "scratch")); err == nil {
+		t.Fatal("OpenScratch accepted the scratch root itself")
+	}
+}
+
+func TestPromoteScratch(t *testing.T) {
+	ctx := ctxT(t)
+	m, _ := NewManager(t.TempDir())
+	ws, err := m.CreateScratch(ctx, "promotable")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Two snapshots so the chain has history to preserve.
+	write(t, ws.Dir, "a.txt", "one\n")
+	s1, err := ws.Snapshot(ctx, "turn 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, ws.Dir, "a.txt", "two\n")
+	write(t, ws.Dir, "b.txt", "new\n")
+	s2, err := ws.Snapshot(ctx, "turn 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(t.TempDir(), "projects", "promoted")
+	oldDir := ws.Dir
+	moved, err := m.PromoteScratch(ctx, ws, target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.Kind != KindRepo || moved.Dir != target {
+		t.Fatalf("promoted = %+v", moved)
+	}
+	if _, err := os.Stat(oldDir); !os.IsNotExist(err) {
+		t.Fatalf("old scratch dir still present: %v", err)
+	}
+	if b, err := os.ReadFile(filepath.Join(target, "a.txt")); err != nil || string(b) != "two\n" {
+		t.Fatalf("worktree content after move: %q, %v", b, err)
+	}
+
+	// The snapshot chain survived the move: latest matches, and diffs
+	// between pre-move snapshots still resolve in the new location.
+	if got := moved.LatestSnapshot(ctx); got != s2.Commit {
+		t.Fatalf("latest snapshot after move = %q, want %q", got, s2.Commit)
+	}
+	changes, err := moved.Diff(ctx, s1.Commit, s2.Commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changes) != 2 {
+		t.Fatalf("diff across move = %+v", changes)
+	}
+	// And the moved workspace keeps working: another snapshot chains on.
+	write(t, moved.Dir, "c.txt", "post-move\n")
+	s3, err := moved.Snapshot(ctx, "turn 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s3.Changed {
+		t.Fatal("post-move snapshot reported no change")
+	}
+
+	// Refusals: non-scratch workspaces and non-empty targets.
+	if _, err := m.PromoteScratch(ctx, moved, filepath.Join(t.TempDir(), "again")); err == nil {
+		t.Fatal("promoted a repo workspace")
+	}
+	ws2, err := m.CreateScratch(ctx, "second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.PromoteScratch(ctx, ws2, newUserRepo(t)); err == nil {
+		t.Fatal("promoted into a non-empty directory")
+	}
+
+	// An existing but EMPTY directory is allowed.
+	emptyTarget := filepath.Join(t.TempDir(), "empty")
+	if err := os.MkdirAll(emptyTarget, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.PromoteScratch(ctx, ws2, emptyTarget); err != nil {
+		t.Fatalf("promote into empty dir: %v", err)
+	}
+}
+
+func TestCopyTree(t *testing.T) {
+	src := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(src, "sub/deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, src, "top.txt", "top\n")
+	write(t, filepath.Join(src, "sub/deep"), "leaf.txt", "leaf\n")
+	if err := os.Chmod(filepath.Join(src, "top.txt"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("top.txt", filepath.Join(src, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	dst := filepath.Join(t.TempDir(), "copy")
+	if err := copyTree(src, dst); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dst, "sub/deep/leaf.txt")); string(b) != "leaf\n" {
+		t.Fatalf("leaf = %q", b)
+	}
+	if info, err := os.Stat(filepath.Join(dst, "top.txt")); err != nil || info.Mode().Perm() != 0o750 {
+		t.Fatalf("permissions not preserved: %v, %v", info, err)
+	}
+	if link, err := os.Readlink(filepath.Join(dst, "link")); err != nil || link != "top.txt" {
+		t.Fatalf("symlink = %q, %v", link, err)
+	}
+}

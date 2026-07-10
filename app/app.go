@@ -223,6 +223,91 @@ func (a *App) CreateConversation(title, repoPath string) (*transcript.Conversati
 	return conv, nil
 }
 
+// PromoteConversation turns a scratch conversation into a project: a
+// native save dialog picks a new directory, the scratch workspace moves
+// there whole (snapshot chain intact), and the conversation is
+// re-associated. Returns nil when the dialog is cancelled.
+func (a *App) PromoteConversation(convID string) (*transcript.Conversation, error) {
+	a.mu.Lock()
+	if a.running[convID] {
+		a.mu.Unlock()
+		return nil, fmt.Errorf("a turn is running in this conversation")
+	}
+	a.mu.Unlock()
+
+	conv, err := a.store.GetConversation(a.ctx, convID)
+	if err != nil {
+		return nil, err
+	}
+	if conv.ProjectPath != "" {
+		return nil, fmt.Errorf("conversation already belongs to project %s", conv.ProjectPath)
+	}
+	ws, err := a.workspaceFor(convID)
+	if err != nil {
+		return nil, err
+	}
+	if ws.Kind != workspace.KindScratch {
+		return nil, fmt.Errorf("conversation workspace is %s, not scratch", ws.Kind)
+	}
+
+	target, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:                "Choose a NEW directory for this project",
+		DefaultFilename:      conv.Title,
+		CanCreateDirectories: true,
+	})
+	if err != nil || target == "" {
+		return nil, err
+	}
+
+	promoted, err := a.mgr.PromoteScratch(a.ctx, ws, target)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := a.store.SetConversationProject(a.ctx, convID, promoted.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("workspace moved to %s but re-associating failed: %w", promoted.Dir, err)
+	}
+	a.mu.Lock()
+	a.wsByConv[convID] = promoted
+	a.mu.Unlock()
+	return updated, nil
+}
+
+// MoveConversation re-associates a conversation with an existing project
+// repo (projectPath "" detaches it back to scratch). Only the association
+// changes: future turns run in the project repo; past turns keep their
+// historical workspace refs and snapshots, and a previous scratch
+// workspace stays on disk as history.
+func (a *App) MoveConversation(convID, projectPath string) (*transcript.Conversation, error) {
+	a.mu.Lock()
+	if a.running[convID] {
+		a.mu.Unlock()
+		return nil, fmt.Errorf("a turn is running in this conversation")
+	}
+	a.mu.Unlock()
+
+	var ws *workspace.Workspace
+	if projectPath != "" {
+		var err error
+		if ws, err = a.mgr.OpenRepo(a.ctx, projectPath); err != nil {
+			return nil, err
+		}
+		projectPath = ws.Dir
+	}
+	updated, err := a.store.SetConversationProject(a.ctx, convID, projectPath)
+	if err != nil {
+		return nil, err
+	}
+	a.mu.Lock()
+	if ws != nil {
+		a.wsByConv[convID] = ws
+	} else {
+		delete(a.wsByConv, convID) // next turn re-resolves (last dir or fresh scratch)
+	}
+	a.mu.Unlock()
+	return updated, nil
+}
+
 // DeleteConversation removes a conversation (turns and events; artifacts
 // are kept — they may be shared or exported). Refused while a turn is
 // running in it.
@@ -359,8 +444,12 @@ func (a *App) workspaceFor(convID string) (*workspace.Workspace, error) {
 		}
 	} else if turns, err := a.store.ListTurns(a.ctx, convID); err == nil && len(turns) > 0 {
 		if dir := turns[len(turns)-1].WorkspaceRef; dir != "" {
-			if w, err := a.mgr.OpenRepo(a.ctx, dir); err == nil {
-				ws = w // a scratch dir is a git repo; reopening keeps snapshots chained
+			// A managed scratch dir reopens as scratch (keeps promotion
+			// and restore rights); anything else as a plain repo.
+			if w, err := a.mgr.OpenScratch(a.ctx, dir); err == nil {
+				ws = w
+			} else if w, err := a.mgr.OpenRepo(a.ctx, dir); err == nil {
+				ws = w // reopening keeps the snapshot chain either way
 			}
 		}
 	}

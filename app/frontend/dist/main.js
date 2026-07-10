@@ -350,6 +350,8 @@ async function openConversation(conv) {
   $("conv-meta").textContent = conv.project_path
     ? conv.project_path
     : "scratch workspace";
+  $("make-project").hidden = !!conv.project_path;
+  $("move-form").hidden = true;
 
   const transcript = $("transcript");
   transcript.replaceChildren();
@@ -478,6 +480,61 @@ async function exportBundle() {
   }
 }
 
+/* ---------- project promotion & moving ---------- */
+
+async function makeProject() {
+  if (!state.current) return;
+  try {
+    const conv = await api().PromoteConversation(state.current.id);
+    if (!conv) return; // dialog cancelled
+    toast(`project created at ${conv.project_path}`);
+    await loadConversations(conv.id);
+  } catch (err) {
+    toast(`promote failed: ${err}`);
+  }
+}
+
+// openMoveForm reveals a target picker: known projects, scratch, or a
+// freshly picked repo directory.
+async function openMoveForm() {
+  if (!state.current) return;
+  const f = $("move-form");
+  f.hidden = !f.hidden;
+  if (f.hidden) return;
+
+  const sel = $("move-target");
+  sel.replaceChildren();
+  sel.append(new Option("No project (scratch)", ""));
+  try {
+    for (const p of (await api().Projects()) || []) {
+      if (p.path === state.current.project_path) continue; // already there
+      sel.append(new Option(`${p.label} — ${p.path}`, p.path));
+    }
+  } catch (err) {
+    toast(String(err));
+  }
+  sel.append(new Option("Other repo…", "__other__"));
+  sel.value = "";
+}
+
+async function moveConversation(evSubmit) {
+  evSubmit.preventDefault();
+  if (!state.current) return;
+  let target = $("move-target").value;
+  try {
+    if (target === "__other__") {
+      target = await api().PickRepoDirectory();
+      if (!target) return;
+    }
+    const conv = await api().MoveConversation(state.current.id, target);
+    $("move-form").hidden = true;
+    toast(target ? `moved to ${conv.project_path}` : "detached to scratch");
+    await loadConversations(conv.id);
+  } catch (err) {
+    toast(`move failed: ${err}`);
+  }
+}
+
 /* ---------- new conversation ---------- */
 
 // openNewForm toggles the creation form and (re)populates its project
@@ -547,6 +604,11 @@ window.addEventListener("DOMContentLoaded", async () => {
       $("composer").requestSubmit();
     }
   });
+
+  $("make-project").onclick = makeProject;
+  $("move-conv").onclick = openMoveForm;
+  $("move-form").onsubmit = moveConversation;
+  $("move-cancel").onclick = () => { $("move-form").hidden = true; };
 
   $("show-artifacts").onclick = showArtifacts;
   $("close-artifacts").onclick = () => { $("artifact-panel").hidden = true; };

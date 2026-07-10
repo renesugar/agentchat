@@ -57,6 +57,17 @@ point of the app.
      result can be packed as a ZIP so it is ready for the next turn or for
      download.
 
+   A scratch workspace can be **promoted** into a project
+   (`Manager.PromoteScratch`): the whole directory — including `.git`
+   and the `refs/agentchat/snapshots` chain — moves to a user-chosen
+   location as a plain directory move (rename, or copy+verify+remove
+   across filesystems), so SnapshotIDs recorded on past turns stay
+   valid; the conversation is then re-associated via
+   `Store.SetConversationProject`. Conversations can likewise be moved
+   between existing projects: only the association changes — future
+   turns resolve to the new project repo, past turns keep their
+   historical workspace refs and snapshots.
+
 6. **Artifact library.** Content-addressed storage for user uploads and
    generated files. For very large repos, store a *link* (local path +
    optional remote URL as an archival fallback) rather than a ZIP copy.

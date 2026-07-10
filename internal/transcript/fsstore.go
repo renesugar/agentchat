@@ -251,6 +251,23 @@ func (s *FSStore) Events(ctx context.Context, convID, turnID string) ([]adapter.
 	return out, sc.Err()
 }
 
+// SetConversationProject implements Store.
+func (s *FSStore) SetConversationProject(ctx context.Context, id, projectPath string) (*Conversation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	c, err := s.GetConversation(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	c.ProjectPath = projectPath
+	c.UpdatedAt = s.now().UTC()
+	if err := writeJSON(filepath.Join(s.convDir(id), "conversation.json"), c); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // DeleteConversation implements Store.
 func (s *FSStore) DeleteConversation(ctx context.Context, id string) error {
 	s.mu.Lock()

@@ -51,6 +51,10 @@ Go 1.26.
   refused while a turn is running
 - `Projects()` — distinct projects derived from conversations
   ({path, label, count}); feeds the sidebar groups and creation picker
+- `PromoteConversation(conv)` — save-dialog: move the scratch workspace
+  (snapshot chain intact) to a new directory and make it the project
+- `MoveConversation(conv, path)` — re-associate with a project repo
+  ("" detaches); future turns run there, history stays untouched
 - `UIState()` / `SetUIState(json)` — persisted frontend state
   (`<data>/ui-state.json`; e.g. which project groups are collapsed)
 - `ImportBundle()` — open-dialog restore of an exported bundle; refuses

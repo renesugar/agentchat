@@ -58,6 +58,8 @@ func run() error {
 		exportZip = flag.String("export-bundle", "", "write a ZIP bundle of -conv (transcript+artifacts[+workspace via -dir]) to this file, then exit")
 		importZip = flag.String("import-bundle", "", "restore a conversation from this bundle ZIP, then exit")
 		deleteID  = flag.String("delete-conv", "", "delete this conversation (turns+events; artifacts are kept), then exit")
+		setProj   = flag.String("set-project", "", "re-associate -conv with this project repo path (\"-\" detaches to scratch), then exit")
+		promote   = flag.String("promote", "", "move -conv's scratch workspace to this NEW directory and make it the project, then exit")
 		asJSON    = flag.Bool("json", false, "print events as JSON lines")
 		useMCP    = flag.Bool("mcp", true, "expose the MCP callback channel (loopback) to MCP-capable clients")
 		listOnly  = flag.Bool("list", false, "list adapters and models, then exit")
@@ -98,6 +100,73 @@ func run() error {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "deleted conversation %s (artifacts kept)\n", *deleteID)
+		return nil
+	}
+
+	if *setProj != "" {
+		if *convID == "" {
+			return fmt.Errorf("-set-project requires -conv <conversation id>")
+		}
+		mgr, err := workspace.NewManager(filepath.Join(store.Root(), "workspaces"))
+		if err != nil {
+			return err
+		}
+		path := *setProj
+		if path == "-" {
+			path = "" // detach back to scratch
+		} else {
+			ws, err := mgr.OpenRepo(ctx, path)
+			if err != nil {
+				return err
+			}
+			path = ws.Dir
+		}
+		conv, err := store.SetConversationProject(ctx, *convID, path)
+		if err != nil {
+			return err
+		}
+		if conv.ProjectPath == "" {
+			fmt.Fprintf(os.Stderr, "conversation %s detached from its project\n", conv.ID)
+		} else {
+			fmt.Fprintf(os.Stderr, "conversation %s now belongs to %s\n", conv.ID, conv.ProjectPath)
+		}
+		return nil
+	}
+
+	if *promote != "" {
+		if *convID == "" {
+			return fmt.Errorf("-promote requires -conv <conversation id>")
+		}
+		mgr, err := workspace.NewManager(filepath.Join(store.Root(), "workspaces"))
+		if err != nil {
+			return err
+		}
+		conv, err := store.GetConversation(ctx, *convID)
+		if err != nil {
+			return err
+		}
+		if conv.ProjectPath != "" {
+			return fmt.Errorf("conversation already belongs to project %s", conv.ProjectPath)
+		}
+		turns, err := store.ListTurns(ctx, *convID)
+		if err != nil {
+			return err
+		}
+		if len(turns) == 0 || turns[len(turns)-1].WorkspaceRef == "" {
+			return fmt.Errorf("conversation has no workspace to promote (no turns yet)")
+		}
+		ws, err := mgr.OpenScratch(ctx, turns[len(turns)-1].WorkspaceRef)
+		if err != nil {
+			return err
+		}
+		promoted, err := mgr.PromoteScratch(ctx, ws, *promote)
+		if err != nil {
+			return err
+		}
+		if _, err := store.SetConversationProject(ctx, *convID, promoted.Dir); err != nil {
+			return fmt.Errorf("workspace moved to %s but re-associating failed: %w", promoted.Dir, err)
+		}
+		fmt.Fprintf(os.Stderr, "promoted: conversation %s → project %s\n", *convID, promoted.Dir)
 		return nil
 	}
 

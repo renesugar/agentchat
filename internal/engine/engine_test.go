@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -103,6 +104,78 @@ func TestRunTurnSnapshotsWorkspace(t *testing.T) {
 	}
 	if len(changes) != 1 || changes[0].Path != "silent.txt" {
 		t.Fatalf("snapshot diff = %+v", changes)
+	}
+}
+
+// TestMoveConversationToProject exercises the Step 17 flow at engine
+// level: after SetConversationProject, callers resolve the workspace from
+// ProjectPath, so the next turn runs (and snapshots) in the project repo
+// while earlier turns keep their historical refs; sidebar grouping
+// follows via transcript.Projects.
+func TestMoveConversationToProject(t *testing.T) {
+	ctx := context.Background()
+	store, err := transcript.NewFSStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := workspace.NewManager(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch, err := mgr.CreateScratch(ctx, "mover")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reg := adapter.NewRegistry()
+	reg.Register(echo.New())
+	eng := engine.New(reg, store)
+	conv, _ := store.CreateConversation(ctx, transcript.NewConversation{Title: "mover"})
+
+	t1, err := eng.RunTurn(ctx, conv.ID, "echo", scratch, adapter.TurnRequest{Prompt: "one"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Move: associate with a project repo (git-inited like a user repo).
+	repoDir := t.TempDir()
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.name=u", "-c", "user.email=u@x", "commit", "-q", "--allow-empty", "-m", "init"}} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	moved, err := store.SetConversationProject(ctx, conv.ID, repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Future resolution prefers ProjectPath (what App.workspaceFor does).
+	projWS, err := mgr.OpenRepo(ctx, moved.ProjectPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t2, err := eng.RunTurn(ctx, conv.ID, "echo", projWS, adapter.TurnRequest{Prompt: "two"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if t2.WorkspaceRef != projWS.Dir || t2.SnapshotID == "" {
+		t.Fatalf("turn 2 ran in %q (snapshot %q), want project repo %q", t2.WorkspaceRef, t2.SnapshotID, projWS.Dir)
+	}
+	// History untouched: turn 1 still points at the scratch workspace.
+	if t1.WorkspaceRef != scratch.Dir {
+		t.Fatalf("turn 1 ref rewritten to %q", t1.WorkspaceRef)
+	}
+
+	// Grouping follows the association.
+	convs, err := store.ListConversations(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := transcript.Projects(convs)
+	if len(projects) != 1 || projects[0].Path != repoDir || projects[0].Count != 1 {
+		t.Fatalf("Projects = %+v", projects)
 	}
 }
 

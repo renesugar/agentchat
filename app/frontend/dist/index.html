@@ -50,11 +50,19 @@
             <p id="conv-meta"></p>
           </div>
           <div class="actions">
+            <button id="make-project" class="ghost" title="Move this scratch workspace to a new directory and make it a project">Make project…</button>
+            <button id="move-conv" class="ghost" title="Re-associate this conversation with a project">Move…</button>
             <button id="show-artifacts" class="ghost">Artifacts</button>
             <button id="export-md" class="ghost">Save transcript</button>
             <button id="export-zip" class="ghost">Save bundle</button>
           </div>
         </header>
+
+        <form id="move-form" hidden>
+          <select id="move-target" aria-label="Move to project"></select>
+          <button type="submit">Move</button>
+          <button type="button" id="move-cancel" class="ghost">Cancel</button>
+        </form>
 
         <div id="transcript" aria-live="polite"></div>
 
