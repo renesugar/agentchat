@@ -11,7 +11,7 @@ the client version you verified it against. Planned invocations (unverified)
 are marked ⚠ — verify with `<client> --help` before implementing the adapter
 and update this file in the same commit.
 
-## claude (Claude Code) — Step 3 ✅ implemented (⚠ flags unverified against a live install)
+## claude (Claude Code) — Step 3 ✅ implemented, ✅ verified live against claude 2.1.206 (2026-07-10)
     claude -p --output-format stream-json --verbose \
         [--model <id>] [--resume <session_id>] \
         --permission-mode acceptEdits -- "<prompt>"
@@ -27,11 +27,15 @@ and update this file in the same commit.
   `Extra["permission_mode"]` ("" omits the flag entirely).
 - Model aliases offered: sonnet / opus / haiku; any full model ID passes
   through.
-- TODO when a live `claude` is available: run once, confirm flags with
-  `claude --help` and record the version here; capture a fresh fixture if
-  the stream format drifted (fixtures: `internal/adapters/claudecode/testdata/`).
+- ✅ Verified live (claude 2.1.206, 2026-07-10): full turn + `--resume`
+  round trip. `system/init` (session_id), `assistant` thinking/text
+  blocks, and the terminal `result` line (result, is_error, duration_ms,
+  usage) all match the parser; resume keeps the same session_id. New
+  stream line types `rate_limit_event` and `system/thinking_tokens`
+  appear and are ignored (unknown types are skipped by design) — no
+  fixture drift. `--effort <level>` exists at launch (Step 13).
 
-## codex (Codex CLI) — Step 4 ✅ implemented (verified against docs/web, not a live install)
+## codex (Codex CLI) — Step 4 ✅ implemented, ✅ verified live against codex-cli 0.142.5 (2026-07-10)
     codex exec --json --sandbox workspace-write --skip-git-repo-check \
         [--model <id>] [resume <thread_id>] -
 - Prompt is piped to stdin (the trailing `-`), avoiding quoting issues.
@@ -51,16 +55,21 @@ and update this file in the same commit.
   workspaces (disable per turn via Extra["skip_git_repo_check"]="false").
 - Sandbox defaults to workspace-write; override via Extra["sandbox"]
   (read-only | workspace-write | danger-full-access; "" omits the flag).
-- ⚠ resume caveat: some codex versions reject --json/--model/--sandbox
-  when resuming; flag placement here (before the `resume` subcommand)
-  matches current documented behavior. On a live install run
-  `codex exec --help` and one resume turn to confirm; record the
-  `codex --version` here. Also note: resuming an `--ephemeral` or
-  missing session silently starts a NEW session (thread_id changes) —
-  the adapter reports the new session_id, so the transcript stays
-  correct, but continuity is lost.
+- ✅ Verified live (codex-cli 0.142.5, 2026-07-10): a real `--json` turn
+  streams exactly the events the parser handles (thread.started,
+  item.completed, turn.started, "Reconnecting... X/Y" error notices,
+  turn.failed; `type` key, not the legacy `item_type`). Resume flag
+  placement `exec --json --sandbox … --skip-git-repo-check resume <id> -`
+  parses fine (clap accepts exec-level flags before the subcommand; the
+  `resume` subcommand itself re-defines --json/--model/
+  --skip-git-repo-check but NOT --sandbox, so keep --sandbox before
+  `resume`). Behavior change vs. the old caveat: resuming a missing
+  session now FAILS loudly ("no rollout found for thread id …",
+  code -32600) instead of silently starting a new session — the turn
+  errors and the transcript keeps the old session, which is the better
+  outcome for continuity.
 
-## aider — Step 5 ✅ implemented (⚠ flags unverified against a live install)
+## aider — Step 5 ✅ implemented, ✅ flags verified against aider 0.86.2 (2026-07-10)
     aider --message "<prompt>" --yes-always --no-stream --no-pretty \
         [--model <id>] [--restore-chat-history]
 - Output is line-oriented text. Parsing is heuristic: prose (including
@@ -79,11 +88,17 @@ and update this file in the same commit.
 - API keys/base URLs (incl. OpenAI-compatible servers like LocalAI) pass
   through the environment (OPENAI_API_KEY, OPENAI_API_BASE,
   ANTHROPIC_API_KEY, ...) via TurnRequest.Env — Step 11 wires config.
-- TODO when a live `aider` is available: verify flags with `aider
-  --help`, record the version, and sanity-check the noise-prefix list
-  against real output (it varies slightly across versions).
+- ✅ Verified (aider 0.86.2, 2026-07-10): all flags (--message,
+  --yes-always, --no-stream, --no-pretty, --model,
+  --restore-chat-history, and --reasoning-effort for Step 13) accepted
+  by a live run; the run reached aider's model/key setup, so parsing is
+  confirmed. Noise-prefix list extended from real output: "Warning:
+  Input is not a terminal" (emitted on every piped run) and the
+  first-run privacy/analytics banner. A full end-to-end turn still
+  needs a configured API key/model — the line heuristics remain as
+  fixtures describe.
 
-## swival — Step 6 ✅ implemented (verified against swival.dev docs, not a live install)
+## swival — Step 6 ✅ implemented, ✅ verified live against swival 1.0.25 (2026-07-10)
     swival [--quiet] [--profile P] [--provider P] [--base-url U] \
         [--model M] [--reasoning-effort E] [--max-turns N] \
         --report <tmpfile>        # task piped to stdin
@@ -114,9 +129,17 @@ and update this file in the same commit.
 - Exit codes (documented): 0 success; 1 runtime/config failure; 2 turn
   limit reached (adapter returns the partial answer plus an explicit
   error); 130/143 signals.
-- TODO when a live `swival` is available: confirm flags with `swival
-  --help`, pin the version, and pin the report stats token-counter key
-  names (then simplify applyReport).
+- ✅ Verified live (swival 1.0.25, 2026-07-10): all flags accepted;
+  task piped via stdin works; --report writes the JSON report even when
+  the run fails. Report schema observed: version/mode/task/model/
+  provider, `result.{outcome,answer,exit_code,error_message}`,
+  `stats` (turns, tool_calls_*, llm_calls, timing — **no token
+  counters in this version**), `timeline`. So the timeline
+  llm_call fallback in applyReport is the operative token path; the
+  defensive stats-key lookup stays for future versions. Provider list
+  grew to include `geap` and `vertexai` (alias). A full end-to-end
+  turn needs a running model server (default: LM Studio at
+  127.0.0.1:1234).
 
 ## echo (fake) — built in
     agentchat-cli -client echo -dir <workspace> "<prompt>"

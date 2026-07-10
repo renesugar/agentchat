@@ -36,6 +36,11 @@ var noisePrefixes = []string{
 	"Cur working dir",
 	"Warning: it's best to only add files",
 	"Initial repo scan",
+	// Always emitted when aider runs non-interactively (stdin is a pipe).
+	"Warning: Input is not a terminal",
+	// First-run analytics/privacy notice (seen on aider 0.86.2).
+	"Aider respects your privacy",
+	"For more info: https://aider.chat",
 }
 
 // parseState accumulates what the terminal Result needs.

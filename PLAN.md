@@ -42,8 +42,8 @@ in a compiling state**.
   Parser (stream.go) is separate from process execution and covered by
   fixtures in `testdata/` (success, error, garbage-line tolerance);
   RunTurn is covered via a stub shell script standing in for the binary.
-  Registered in the CLI harness. Flags still need one verification pass
-  against a live install — see docs/adapters.md.
+  Registered in the CLI harness. Verified live against claude 2.1.206
+  (turn + resume; no stream drift) — see docs/adapters.md.
 
 - [x] **Step 4 — Codex adapter.** `internal/adapters/codex`. Non-interactive:
   `codex exec --json --sandbox workspace-write --skip-git-repo-check
@@ -51,8 +51,9 @@ in a compiling state**.
   covers thread/turn/item JSONL events (agent_message, reasoning,
   command_execution, file_change, mcp_tool_call, web_search, todo_list,
   error; reconnect notices non-fatal; legacy item_type key accepted).
-  Fixture + stub-binary tests as in Step 3. Resume-flag caveats recorded
-  in docs/adapters.md pending one pass against a live install.
+  Fixture + stub-binary tests as in Step 3. Verified live against
+  codex-cli 0.142.5 (stream format + resume flag placement; missing
+  sessions now fail loudly) — see docs/adapters.md.
 
 - [x] **Step 5 — Aider adapter.** `internal/adapters/aider`. Non-interactive:
   `aider --message <prompt> --yes-always --no-stream --no-pretty
@@ -71,7 +72,8 @@ in a compiling state**.
   from a `git status --porcelain` before/after diff; documented exit
   codes handled (2 = turn limit → partial result + explicit error).
   Provider/base-url/profile via Extra. Report-fixture, porcelain-diff,
-  and stub-binary tests. Details and live-install TODOs in
+  and stub-binary tests. Flags + report schema verified live against
+  swival 1.0.25 (aider flags likewise against 0.86.2) — details in
   docs/adapters.md.
 
 - [x] **Step 7 — Workspace manager.** `internal/workspace`. Kinds: repo /
