@@ -5,3 +5,4 @@
 /app/app
 /app/build/
 .claude/settings.local.json*
+/app/frontend/wailsjs/
