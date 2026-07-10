@@ -273,6 +273,38 @@ in a compiling state**.
   repo, history untouched, Projects() grouping follows). Promote/move
   also smoke-tested on real data via the CLI.
 
+- [ ] **Step 18 — Client-config isolation audit.** AgentChat must NEVER
+  write (or cause clients to write) the user's client configuration
+  files; all per-turn settings must travel via command-line flags,
+  process environment, or per-invocation overrides. Codex is already
+  audited and documented (docs/adapters.md: everything goes through
+  `-c key=value` per-invocation overrides; ~/.codex/* is never touched).
+  Extend the same audit + written guarantee to the remaining clients:
+  - claude: verify `--mcp-config` (inline JSON), `--allowedTools`,
+    `--permission-mode`, `--effort`, `--model` are session-scoped and
+    never persist to ~/.claude.json / ~/.claude/settings.json /
+    .claude/settings*.json in the workspace; confirm no adapter path
+    writes those files.
+  - aider: adapter passes flags only (--message, --model,
+    --reasoning-effort, ...) — verify no flag we use causes aider to
+    write .aider.conf.yml or .env; note that aider DOES write its own
+    history files (.aider.chat.history.md etc.) in the workspace, which
+    is its normal per-workspace state, not configuration.
+  - swival: flags + stdin only; verify .swival/ workspace state is the
+    only thing written and no user-level config is created/modified.
+  - echo: trivially clean (writes only ECHO.md in the workspace).
+  - Grep-level audit of the repo for writes outside <data> and the
+    workspace (os.WriteFile/Create/Rename/MkdirAll call sites) — the
+    only allowed write roots are the AgentChat data dir, the managed
+    workspace/scratch dirs, os.TempDir, and user-chosen export/promote
+    targets from dialogs.
+  - Record the per-client guarantee in docs/adapters.md (mirroring the
+    codex note) and add a "Client config isolation" section to
+    ARCHITECTURE.md.
+  - Tests where cheap: extend the existing stub-binary RunTurn tests to
+    run with HOME pointed at a temp dir and assert no config files
+    appear there after a turn.
+
 ## Definition of done for any step
 
 1. `make check` passes (fmt, vet, test).
