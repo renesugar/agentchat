@@ -16,6 +16,22 @@ bundler, nothing to install besides Wails itself.
     wails dev           # live-reload development
     wails build         # production binary in build/bin/
 
+Prefer the root Makefile targets — they handle the webkit build tag:
+
+    make app-build-check   # compile + vet with production tags, no packaging
+    make app-dev
+    make app-build
+
+On Linux distros that ship only webkit2gtk-4.1 (Ubuntu 24.04+, no
+webkit2gtk-4.0 dev package), wails needs `-tags webkit2_41`; the Makefile
+detects this via pkg-config. `wails doctor` may still warn about the
+missing 4.0 package — that warning is harmless when the tag is used.
+
+Pinned wails module version: **v2.13.0** (matches the wails CLI it was
+verified with; keep the CLI and the `go.mod` requirement in sync when
+upgrading). Verified compiling on Linux with webkit2gtk-4.1 (2.52.3),
+Go 1.26.
+
 ## Architecture
 
 `app.go` is a thin binding layer over the headless engine:

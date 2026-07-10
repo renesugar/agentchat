@@ -128,11 +128,12 @@ in a compiling state**.
   carries a colored spine keyed to its agent, live event streaming with
   an optimistic turn block replaced by the authoritative record,
   composer with client+model pickers (Ctrl+Enter runs), artifact panel,
-  adapter availability footer. ⚠ VERIFY ON A REAL MACHINE: `make
-  app-tidy && make app-dev` (see app/README.md); this sandbox cannot
-  fetch the wails module, so the app module is gofmt/syntax-checked but
-  not compiled — expect at most minor binding-API fixes, and pin the
-  exact wails version go mod tidy resolves.
+  adapter availability footer. Verified on a real machine (2026-07-10):
+  compiles with wails **v2.13.0** (pinned in app/go.mod, matching the
+  installed wails CLI) with no binding-API fixes needed. Linux with only
+  webkit2gtk-4.1 needs `-tags webkit2_41`; the root Makefile autodetects
+  this via pkg-config for app-dev/app-build and the new app-build-check
+  target (see app/README.md).
 
 - [x] **Step 11 — Providers & config.** `internal/config` +
   `internal/clients`. JSON config at `<data>/config.json` (stdlib-only,
