@@ -168,7 +168,21 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .turn > .who .seq { color: var(--muted); font-weight: 400; margin-right: 8px; }
 .turn > .who .model { color: var(--muted); font-weight: 400; }
+.turn > .who .model + .model { margin-left: 8px; }
 .turn > .who .status-failed { color: #e08a8a; margin-left: 8px; }
+.turn > .who .copy-turn {
+  visibility: hidden;
+  margin-left: 8px;
+  padding: 0 6px;
+  font: 400 11px var(--mono);
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.turn:hover > .who .copy-turn { visibility: visible; }
+.turn > .who .copy-turn:hover { color: var(--text); }
 
 .prompt {
   background: var(--panel);

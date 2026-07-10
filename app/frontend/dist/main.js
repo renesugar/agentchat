@@ -32,6 +32,25 @@ function toast(msg) {
   t._timer = setTimeout(() => { t.hidden = true; }, 4000);
 }
 
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Webview denied the async clipboard API; fall back to execCommand.
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
 function fmtWhen(iso) {
   const d = new Date(iso);
   return isNaN(d) ? "" : d.toLocaleString(undefined, {
@@ -129,6 +148,20 @@ function turnHeader(turn) {
   who.append(el("span", "model", turn.model || "default model"));
   if (turn.effort) who.append(el("span", "model", `effort ${turn.effort}`));
   if (turn.status === "failed") who.append(el("span", "status-failed", "failed"));
+
+  const copy = el("button", "copy-turn", "copy");
+  copy.type = "button";
+  copy.title = "Copy this turn as markdown";
+  copy.addEventListener("click", async () => {
+    try {
+      const md = await api().TurnMarkdown(turn.conversation_id, turn.id);
+      if (await copyText(md)) toast(`copied turn #${turn.seq} as markdown`);
+      else toast("copy failed: clipboard unavailable");
+    } catch (err) {
+      toast(`copy failed: ${err}`);
+    }
+  });
+  who.append(copy);
   return who;
 }
 

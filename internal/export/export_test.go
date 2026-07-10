@@ -132,6 +132,40 @@ func TestMarkdownGolden(t *testing.T) {
 	}
 }
 
+// TestTurnMarkdownEmbedded pins the per-turn copy contract: the full
+// transcript embeds exactly TurnMarkdown's output for every turn, so the
+// two renderings can never drift apart.
+func TestTurnMarkdownEmbedded(t *testing.T) {
+	ctx := context.Background()
+	store, lib, convID := buildFixtureConversation(t)
+	ex := &Exporter{Store: store, Library: lib}
+
+	md, err := ex.Markdown(ctx, convID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	turns, err := store.ListTurns(ctx, convID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(turns) == 0 {
+		t.Fatal("fixture has no turns")
+	}
+	for _, turn := range turns {
+		events, err := store.Events(ctx, convID, turn.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		section := TurnMarkdown(turn, events)
+		if len(section) == 0 {
+			t.Fatalf("turn %d: empty TurnMarkdown", turn.Seq)
+		}
+		if !strings.Contains(string(md), string(section)) {
+			t.Errorf("turn %d: transcript does not embed TurnMarkdown output verbatim.\n--- section ---\n%s", turn.Seq, section)
+		}
+	}
+}
+
 func TestBundle(t *testing.T) {
 	ctx := context.Background()
 	store, lib, convID := buildFixtureConversation(t)

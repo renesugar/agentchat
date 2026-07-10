@@ -45,6 +45,8 @@ Go 1.26.
   frontend as the Wails event `turn-event` with payload
   `{conversationId, event}`
 - `ExportMarkdown(conv)` / `ExportBundle(conv)` — save-dialog exports
+- `TurnMarkdown(conv, turn)` — one turn's markdown section (per-turn
+  copy button in the transcript)
 - `Artifacts(conv)` — the conversation's artifact records
 
 Workspace resolution per conversation: cached handle → the conversation's

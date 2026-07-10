@@ -54,6 +54,7 @@ func run() error {
 		dataDir   = flag.String("data", "", "data dir (default $AGENTCHAT_DATA or ~/.agentchat)")
 		scratch   = flag.Bool("scratch", false, "create a scratch workspace under the data dir (ignores -dir)")
 		exportMD  = flag.String("export-md", "", "write a markdown transcript of -conv to this file, then exit")
+		exportSeq = flag.Int("export-turn", 0, "print turn <seq> of -conv as markdown to stdout, then exit")
 		exportZip = flag.String("export-bundle", "", "write a ZIP bundle of -conv (transcript+artifacts[+workspace via -dir]) to this file, then exit")
 		asJSON    = flag.Bool("json", false, "print events as JSON lines")
 		useMCP    = flag.Bool("mcp", true, "expose the MCP callback channel (loopback) to MCP-capable clients")
@@ -91,6 +92,27 @@ func run() error {
 	}
 
 	// Export modes need a conversation, not a prompt.
+	if *exportSeq > 0 {
+		if *convID == "" {
+			return fmt.Errorf("export requires -conv <conversation id>")
+		}
+		turns, err := store.ListTurns(ctx, *convID)
+		if err != nil {
+			return err
+		}
+		for _, t := range turns {
+			if t.Seq != *exportSeq {
+				continue
+			}
+			events, err := store.Events(ctx, *convID, t.ID)
+			if err != nil {
+				return err
+			}
+			_, err = os.Stdout.Write(export.TurnMarkdown(t, events))
+			return err
+		}
+		return fmt.Errorf("conversation %s has no turn with seq %d", *convID, *exportSeq)
+	}
 	if *exportMD != "" || *exportZip != "" {
 		if *convID == "" {
 			return fmt.Errorf("export requires -conv <conversation id>")

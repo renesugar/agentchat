@@ -58,7 +58,8 @@ func (e *Exporter) Markdown(ctx context.Context, convID string) ([]byte, error) 
 		if err != nil {
 			return nil, err
 		}
-		renderTurn(&b, t, events)
+		b.WriteString("\n---\n\n")
+		b.Write(TurnMarkdown(t, events))
 	}
 
 	if e.Library != nil {
@@ -85,7 +86,14 @@ func (e *Exporter) Markdown(ctx context.Context, convID string) ([]byte, error) 
 	return []byte(b.String()), nil
 }
 
-func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) {
+// TurnMarkdown renders one turn as a standalone markdown section: header
+// (seq, client, model/effort, status), prompt, last plan checklist,
+// response text (event stream, falling back to Result.FinalText), file
+// changes, and the snapshot/usage/session footer. Markdown() embeds this
+// exact output per turn, so the full transcript and per-turn copies never
+// drift.
+func TurnMarkdown(t *transcript.Turn, events []adapter.Event) []byte {
+	var b strings.Builder
 	model := t.Model
 	if model == "" {
 		model = "default model"
@@ -93,11 +101,11 @@ func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) 
 	if t.Effort != "" {
 		model += ", effort " + t.Effort
 	}
-	fmt.Fprintf(b, "\n---\n\n## Turn %d — %s (%s) — %s\n\n", t.Seq, t.Client, model, t.Status)
+	fmt.Fprintf(&b, "## Turn %d — %s (%s) — %s\n\n", t.Seq, t.Client, model, t.Status)
 
 	b.WriteString("**Prompt:**\n\n")
 	for _, line := range strings.Split(strings.TrimSpace(t.Prompt), "\n") {
-		fmt.Fprintf(b, "> %s\n", line)
+		fmt.Fprintf(&b, "> %s\n", line)
 	}
 
 	var texts, plans, errs []string
@@ -114,7 +122,7 @@ func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) 
 
 	if len(plans) > 0 {
 		// The last plan event is the most complete (checklists update).
-		fmt.Fprintf(b, "\n**Plan:**\n\n```\n%s\n```\n", plans[len(plans)-1])
+		fmt.Fprintf(&b, "\n**Plan:**\n\n```\n%s\n```\n", plans[len(plans)-1])
 	}
 
 	response := strings.TrimSpace(strings.Join(texts, "\n\n"))
@@ -122,13 +130,13 @@ func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) 
 		response = strings.TrimSpace(t.Result.FinalText)
 	}
 	if response != "" {
-		fmt.Fprintf(b, "\n**Response:**\n\n%s\n", response)
+		fmt.Fprintf(&b, "\n**Response:**\n\n%s\n", response)
 	}
 
 	if t.Status == transcript.TurnFailed {
-		fmt.Fprintf(b, "\n**Error:** %s\n", t.Error)
+		fmt.Fprintf(&b, "\n**Error:** %s\n", t.Error)
 		for _, e := range errs {
-			fmt.Fprintf(b, "- %s\n", e)
+			fmt.Fprintf(&b, "- %s\n", e)
 		}
 	}
 
@@ -136,10 +144,10 @@ func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) 
 		b.WriteString("\n**Files changed:**\n\n")
 		for _, fc := range t.Result.FilesChanged {
 			if fc.Op == adapter.FileRenamed && fc.OldPath != "" {
-				fmt.Fprintf(b, "- %s `%s` → `%s`\n", fc.Op, fc.OldPath, fc.Path)
+				fmt.Fprintf(&b, "- %s `%s` → `%s`\n", fc.Op, fc.OldPath, fc.Path)
 				continue
 			}
-			fmt.Fprintf(b, "- %s `%s`\n", fc.Op, fc.Path)
+			fmt.Fprintf(&b, "- %s `%s`\n", fc.Op, fc.Path)
 		}
 	}
 
@@ -161,8 +169,9 @@ func renderTurn(b *strings.Builder, t *transcript.Turn, events []adapter.Event) 
 		}
 	}
 	if len(meta) > 0 {
-		fmt.Fprintf(b, "\n*%s*\n", strings.Join(meta, " · "))
+		fmt.Fprintf(&b, "\n*%s*\n", strings.Join(meta, " · "))
 	}
+	return []byte(b.String())
 }
 
 // Bundle writes a ZIP at outPath containing transcript.md, the

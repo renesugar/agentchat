@@ -315,6 +315,27 @@ func (a *App) AttachFile(convID string) (*artifact.Artifact, error) {
 	})
 }
 
+// TurnMarkdown renders one turn as a standalone markdown section — the
+// same content the full transcript export embeds for it. Used by the
+// per-turn copy button.
+func (a *App) TurnMarkdown(convID, turnID string) (string, error) {
+	turns, err := a.store.ListTurns(a.ctx, convID)
+	if err != nil {
+		return "", err
+	}
+	for _, t := range turns {
+		if t.ID != turnID {
+			continue
+		}
+		events, err := a.store.Events(a.ctx, convID, turnID)
+		if err != nil {
+			return "", err
+		}
+		return string(export.TurnMarkdown(t, events)), nil
+	}
+	return "", fmt.Errorf("turn %q not found in conversation %q", turnID, convID)
+}
+
 // ExportMarkdown writes the conversation transcript to a user-chosen path
 // and returns it ("" if cancelled).
 func (a *App) ExportMarkdown(convID string) (string, error) {

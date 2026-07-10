@@ -189,23 +189,17 @@ in a compiling state**.
   `App.Run(conv, client, model, effort, prompt)`. Tests: buildArgs per
   adapter, config precedence, engine echo round trip, golden update.
 
-- [ ] **Step 14 — Per-turn copy.** Let users copy one turn as markdown
-  without exporting the whole conversation.
-  - `internal/export`: extract the private renderTurn into a public
-    `TurnMarkdown(turn *transcript.Turn, events []adapter.Event) []byte`
-    (same content as the full transcript's per-turn section: prompt,
-    client/model/status, plan, response, file changes, snapshot/usage
-    footer); `Markdown()` calls it so the two never drift.
-  - App binding `TurnMarkdown(convID, turnID) (string, error)`.
-  - GUI: a small "Copy" button in each turn header (visible on hover is
-    fine) that fetches TurnMarkdown and writes it to the clipboard via
-    navigator.clipboard.writeText (fall back to a hidden textarea +
-    execCommand if the webview denies the API), with a toast on success.
-  - CLI: `-export-turn <seq>` alongside -export-md (writes/prints one
-    turn's markdown).
-  - Tests: TurnMarkdown golden section (reuse the Step 9 fixtures);
-    assert Markdown() output contains exactly the TurnMarkdown output
-    for each turn.
+- [x] **Step 14 — Per-turn copy.** `export.TurnMarkdown(turn, events)
+  []byte` is the public per-turn renderer (header with seq/client/
+  model/effort/status, prompt, plan, response, file changes,
+  snapshot/usage footer — the section now starts at "## Turn", with the
+  "---" separator written by Markdown(), so a copied turn is clean
+  standalone markdown); `Markdown()` embeds it verbatim so the two
+  can't drift, pinned by TestTurnMarkdownEmbedded. App binding
+  `TurnMarkdown(convID, turnID)`; GUI hover-visible "copy" button in
+  each turn header (navigator.clipboard with hidden-textarea
+  execCommand fallback, toast on success/failure). CLI: `-export-turn
+  <seq>` with -conv prints one turn's markdown to stdout.
 
 - [ ] **Step 15 — Bundle import (round-trippable bundles + conversation
   delete).** Users can import a previously exported bundle — their own or
