@@ -161,7 +161,7 @@ func (s *FSStore) AppendEvent(ctx context.Context, convID, turnID string, e adap
 }
 
 // FinishTurn implements Store.
-func (s *FSStore) FinishTurn(ctx context.Context, convID, turnID string, res *adapter.Result, runErr error) (*Turn, error) {
+func (s *FSStore) FinishTurn(ctx context.Context, convID, turnID string, res *adapter.Result, snapshotID string, runErr error) (*Turn, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -171,6 +171,7 @@ func (s *FSStore) FinishTurn(ctx context.Context, convID, turnID string, res *ad
 	}
 	t.EndedAt = s.now().UTC()
 	t.Result = res
+	t.SnapshotID = snapshotID
 	if runErr != nil {
 		t.Status = TurnFailed
 		t.Error = runErr.Error()

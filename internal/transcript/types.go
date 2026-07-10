@@ -47,8 +47,11 @@ type Turn struct {
 	WorkspaceRef   string     `json:"workspace_ref,omitempty"` // dir/worktree/snapshot id (Step 7 refines)
 	Prompt         string     `json:"prompt"`
 	Status         TurnStatus `json:"status"`
-	StartedAt      time.Time  `json:"started_at"`
-	EndedAt        time.Time  `json:"ended_at,omitempty"`
+	// SnapshotID is the workspace snapshot commit taken after this turn
+	// (empty when the turn ran without a managed workspace).
+	SnapshotID string    `json:"snapshot_id,omitempty"`
+	StartedAt  time.Time `json:"started_at"`
+	EndedAt    time.Time `json:"ended_at,omitempty"`
 
 	// Result is set when Status == TurnDone (and sometimes on failure if
 	// the adapter produced a partial result).

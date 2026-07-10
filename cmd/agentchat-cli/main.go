@@ -31,6 +31,7 @@ import (
 	"github.com/example/agentchat/internal/adapters/swival"
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/transcript"
+	"github.com/example/agentchat/internal/workspace"
 )
 
 func main() {
@@ -50,6 +51,7 @@ func run() error {
 		title     = flag.String("title", "", "title for a new conversation")
 		project   = flag.String("project", "", "project (git repo) path for a new conversation")
 		dataDir   = flag.String("data", "", "data dir (default $AGENTCHAT_DATA or ~/.agentchat)")
+		scratch   = flag.Bool("scratch", false, "create a scratch workspace under the data dir (ignores -dir)")
 		asJSON    = flag.Bool("json", false, "print events as JSON lines")
 		listOnly  = flag.Bool("list", false, "list adapters and models, then exit")
 		listConvs = flag.Bool("conversations", false, "list stored conversations, then exit")
@@ -91,12 +93,32 @@ func run() error {
 		return fmt.Errorf("no prompt given (pass it as trailing arguments)")
 	}
 
+	// Resolve the workspace: -scratch creates a managed scratch dir; a git
+	// repo at -dir becomes a snapshot-managed repo workspace; any other
+	// directory runs unmanaged (no snapshots).
+	mgr, err := workspace.NewManager(filepath.Join(store.Root(), "workspaces"))
+	if err != nil {
+		return err
+	}
+	var ws *workspace.Workspace
 	absDir, err := filepath.Abs(*dir)
 	if err != nil {
 		return err
 	}
-	if st, err := os.Stat(absDir); err != nil || !st.IsDir() {
-		return fmt.Errorf("workspace %q is not a directory", absDir)
+	switch {
+	case *scratch:
+		if ws, err = mgr.CreateScratch(ctx, *title); err != nil {
+			return err
+		}
+		absDir = ws.Dir
+		fmt.Fprintf(os.Stderr, "scratch workspace: %s\n", ws.Dir)
+	default:
+		if st, err := os.Stat(absDir); err != nil || !st.IsDir() {
+			return fmt.Errorf("workspace %q is not a directory", absDir)
+		}
+		if w, err := mgr.OpenRepo(ctx, absDir); err == nil {
+			ws = w
+		}
 	}
 
 	// Resolve or create the conversation.
@@ -127,7 +149,7 @@ func run() error {
 	}
 
 	eng := engine.New(reg, store)
-	turn, err := eng.RunTurn(ctx, id, *client, adapter.TurnRequest{
+	turn, err := eng.RunTurn(ctx, id, *client, ws, adapter.TurnRequest{
 		Prompt:    prompt,
 		WorkDir:   absDir,
 		Model:     *model,
@@ -140,6 +162,9 @@ func run() error {
 		res := turn.Result
 		fmt.Printf("\n[done] conv=%s turn=%s seq=%d exit=%d files=%d session=%q\n",
 			id, turn.ID, turn.Seq, res.ExitCode, len(res.FilesChanged), res.SessionID)
+		if turn.SnapshotID != "" {
+			fmt.Printf("[snapshot] %s\n", turn.SnapshotID)
+		}
 	}
 	return nil
 }

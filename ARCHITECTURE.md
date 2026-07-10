@@ -34,10 +34,14 @@ point of the app.
    Everything else (engine, store, UI) is client-agnostic.
 
 4. **Snapshot between turns.** Because consecutive turns may be executed by
-   different agents, the workspace manager commits (or records a tree hash
-   of) the workspace after every turn. This gives per-turn diffs in the
-   transcript, rollback when one agent makes a mess, and makes export
-   nearly free.
+   different agents, the engine snapshots the workspace after every turn
+   (even failed ones). Snapshots are taken through a temporary git index
+   (add -A → write-tree → commit-tree → refs/agentchat/snapshots/<n>), so
+   they capture untracked files and deletions while never touching the
+   user's HEAD, index, branches, or worktree. This gives per-turn diffs in
+   the transcript, rollback for owned workspaces, and makes export nearly
+   free. When a client's output yields no structured file changes, the
+   snapshot diff fills them in.
 
 5. **Workspace kinds.**
    - `repo`: conversation bound to an existing local git repo (may have a

@@ -75,11 +75,11 @@ func TestTurnLifecycle(t *testing.T) {
 	}
 
 	res := &adapter.Result{ExitCode: 0, FinalText: "hello"}
-	done, err := s.FinishTurn(ctx, c.ID, turn.ID, res, nil)
+	done, err := s.FinishTurn(ctx, c.ID, turn.ID, res, "snap-1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if done.Status != transcript.TurnDone || done.EndedAt.IsZero() || done.Result == nil {
+	if done.Status != transcript.TurnDone || done.EndedAt.IsZero() || done.Result == nil || done.SnapshotID != "snap-1" {
 		t.Fatalf("finish: %+v", done)
 	}
 
@@ -88,7 +88,7 @@ func TestTurnLifecycle(t *testing.T) {
 	if t2.Seq != 2 {
 		t.Fatalf("seq = %d, want 2", t2.Seq)
 	}
-	failed, err := s.FinishTurn(ctx, c.ID, t2.ID, nil, errors.New("boom"))
+	failed, err := s.FinishTurn(ctx, c.ID, t2.ID, nil, "", errors.New("boom"))
 	if err != nil || failed.Status != transcript.TurnFailed || failed.Error != "boom" {
 		t.Fatalf("failed turn: %+v, err=%v", failed, err)
 	}
@@ -123,7 +123,7 @@ func TestEngineRunTurnPersists(t *testing.T) {
 	c, _ := s.CreateConversation(ctx, transcript.NewConversation{Title: "engine"})
 
 	var live int
-	turn, err := eng.RunTurn(ctx, c.ID, "echo", adapter.TurnRequest{
+	turn, err := eng.RunTurn(ctx, c.ID, "echo", nil, adapter.TurnRequest{
 		Prompt:  "persist me",
 		WorkDir: t.TempDir(),
 		Model:   "echo-1",
@@ -146,7 +146,7 @@ func TestEngineRunTurnPersists(t *testing.T) {
 		t.Fatalf("last stored event = %+v, want result", last)
 	}
 
-	if _, err := eng.RunTurn(ctx, c.ID, "nope", adapter.TurnRequest{Prompt: "x", WorkDir: t.TempDir()}, nil); !errors.Is(err, adapter.ErrUnknownAdapter) {
+	if _, err := eng.RunTurn(ctx, c.ID, "nope", nil, adapter.TurnRequest{Prompt: "x", WorkDir: t.TempDir()}, nil); !errors.Is(err, adapter.ErrUnknownAdapter) {
 		t.Fatalf("unknown client err = %v", err)
 	}
 }

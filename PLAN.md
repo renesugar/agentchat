@@ -74,13 +74,19 @@ in a compiling state**.
   and stub-binary tests. Details and live-install TODOs in
   docs/adapters.md.
 
-- [ ] **Step 7 — Workspace manager.** `internal/workspace`. Workspace kinds:
-  `repo` (existing local git repo), `worktree` (created per conversation
-  from a repo), `scratch` (no repo → git-init a temp dir; ZIP snapshot per
-  turn). Auto-snapshot: commit (or record) the tree after every turn so
-  each turn has a pinned tree hash; expose per-turn diffs. Shell out to
-  `git` (no cgo, no go-git dependency). Tests use throwaway repos in
-  `t.TempDir()`.
+- [x] **Step 7 — Workspace manager.** `internal/workspace`. Kinds: repo /
+  worktree / scratch. Snapshots are non-invasive for ALL kinds (temp
+  index → write-tree → commit-tree → refs/agentchat/snapshots/<n>; the
+  user's HEAD, index, branches, and worktree are never touched — tested
+  explicitly), capture untracked files and deletions, chain as parents,
+  and report Changed=false for no-op turns. Diff (name-status -M),
+  Restore (owned kinds only; refuses user repos), Zip (git archive) of
+  any snapshot. Engine integration: turns run in a workspace get
+  snapshotted even on failure, SnapshotID lands on the Turn (FinishTurn
+  gained the param), and when an adapter reports no file changes the
+  snapshot diff fills Result.FilesChanged authoritatively. CLI: -scratch
+  creates a managed workspace; a git repo at -dir is auto-managed;
+  snapshot hash printed per turn.
 
 - [ ] **Step 8 — Artifact library.** `internal/artifact`. Content-addressed
   store under the data dir for user uploads and client outputs. Large-repo
