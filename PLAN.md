@@ -99,11 +99,18 @@ in a compiling state**.
   Step 10 GUI artifact panel. Tests: round-trip, dedupe + GC, links,
   list filtering.
 
-- [ ] **Step 9 — Export.** Markdown transcript of a whole conversation
-  (prompt/response per turn, file-change summaries, per-turn tree hashes)
-  and a ZIP bundle (transcript + artifacts + final workspace snapshot),
-  suitable as context for another coding client or chat GUI. Tests golden-
-  file the markdown.
+- [x] **Step 9 — Export.** `internal/export`. Markdown(): full-transcript
+  document — per turn: prompt, client/model/status, last plan checklist,
+  response text (event stream, falling back to Result.FinalText),
+  file-change list, snapshot hash, usage/session; plus a conversation
+  artifacts section (stored files and link records). Bundle(): ZIP with
+  transcript.md, the conversation's file artifacts under artifacts/
+  (links listed in artifacts/links.md, not copied), and workspace.zip +
+  workspace.txt with the latest snapshot tree when a workspace is given.
+  Golden-file test (IDs/dates/hashes normalized; regenerate with
+  `go test ./internal/export/ -update`) and a bundle round-trip test.
+  CLI: `-conv <id> -export-md f.md` / `-export-bundle f.zip` (bundle
+  picks up the workspace from -dir when it's a managed repo).
 
 - [ ] **Step 10 — Wails shell & chat frontend.** Initialize Wails v2 app
   (`wails init -n agentchat -t svelte` or react; document the choice).

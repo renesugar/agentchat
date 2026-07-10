@@ -29,7 +29,9 @@ import (
 	"github.com/example/agentchat/internal/adapters/codex"
 	"github.com/example/agentchat/internal/adapters/echo"
 	"github.com/example/agentchat/internal/adapters/swival"
+	"github.com/example/agentchat/internal/artifact"
 	"github.com/example/agentchat/internal/engine"
+	"github.com/example/agentchat/internal/export"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -52,6 +54,8 @@ func run() error {
 		project   = flag.String("project", "", "project (git repo) path for a new conversation")
 		dataDir   = flag.String("data", "", "data dir (default $AGENTCHAT_DATA or ~/.agentchat)")
 		scratch   = flag.Bool("scratch", false, "create a scratch workspace under the data dir (ignores -dir)")
+		exportMD  = flag.String("export-md", "", "write a markdown transcript of -conv to this file, then exit")
+		exportZip = flag.String("export-bundle", "", "write a ZIP bundle of -conv (transcript+artifacts[+workspace via -dir]) to this file, then exit")
 		asJSON    = flag.Bool("json", false, "print events as JSON lines")
 		listOnly  = flag.Bool("list", false, "list adapters and models, then exit")
 		listConvs = flag.Bool("conversations", false, "list stored conversations, then exit")
@@ -84,6 +88,45 @@ func run() error {
 		}
 		for _, c := range convs {
 			fmt.Printf("%s\t%s\t%s\t%s\n", c.ID, c.UpdatedAt.Format("2006-01-02 15:04"), c.Title, c.ProjectPath)
+		}
+		return nil
+	}
+
+	// Export modes need a conversation, not a prompt.
+	if *exportMD != "" || *exportZip != "" {
+		if *convID == "" {
+			return fmt.Errorf("export requires -conv <conversation id>")
+		}
+		lib, err := artifact.NewLibrary(filepath.Join(store.Root(), "artifacts"))
+		if err != nil {
+			return err
+		}
+		ex := &export.Exporter{Store: store, Library: lib}
+		if *exportMD != "" {
+			md, err := ex.Markdown(ctx, *convID)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(*exportMD, md, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "wrote %s\n", *exportMD)
+		}
+		if *exportZip != "" {
+			mgr, err := workspace.NewManager(filepath.Join(store.Root(), "workspaces"))
+			if err != nil {
+				return err
+			}
+			var ws *workspace.Workspace
+			if abs, err := filepath.Abs(*dir); err == nil {
+				if w, err := mgr.OpenRepo(ctx, abs); err == nil {
+					ws = w
+				}
+			}
+			if err := ex.Bundle(ctx, *convID, ws, *exportZip); err != nil {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "wrote %s\n", *exportZip)
 		}
 		return nil
 	}
