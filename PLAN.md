@@ -230,26 +230,21 @@ in a compiling state**.
   (store byte-untouched), old-bundle rejection. Verified on real data
   via the CLI.
 
-- [ ] **Step 16 — Sidebar project groups & creation picker.** Make project
-  grouping first-class in the UI (Firefox-tab-group interaction model).
-  - GUI sidebar: each project renders as a collapsible group — a header
-    row (disclosure caret + project name + conversation count) that
-    toggles the group open/closed on click. Conversations with no
-    project are NOT grouped: they render as individual top-level items
-    interleaved after the project groups (replace the current lumped
-    "Scratch" header). Collapse state persists across sessions via small
-    App bindings `UIState()`/`SetUIState(json)` backed by
-    `<data>/ui-state.json` (avoid webview localStorage quirks).
-  - Backend: `App.Projects()` returning distinct known projects derived
-    from conversations — `{path, label (basename), count}` — no separate
-    project registry; conversations remain the source of truth.
-  - New-conversation form: a project select populated from Projects():
-    "No project (scratch)", one entry per known project, and "Other
-    repo…" which reveals the existing path input + directory picker.
-    Selecting a known project passes its path to CreateConversation
-    (which already handles it).
-  - Tests: Projects() derivation (dedupe, counts, scratch excluded);
-    frontend logic is exercised on a real machine per Step 10's caveat.
+- [x] **Step 16 — Sidebar project groups & creation picker.**
+  `transcript.Projects(convs)` derives distinct projects ({path, label
+  = basename, count}, sorted by label then path; scratch excluded) so
+  the derivation lives in the core and is tested by root `make check`;
+  `App.Projects()` wraps it. Sidebar: each project is a collapsible
+  group (caret + label + count header, click/Enter toggles), and
+  conversations without a project render as plain top-level items after
+  the groups (the lumped "Scratch" header is gone). Collapse state
+  persists via `UIState()`/`SetUIState(json)` backed by
+  `<data>/ui-state.json` (webview localStorage is unreliable).
+  New-conversation form: a project select — "No project (scratch)",
+  each known project, "Other repo…" revealing the path input +
+  directory picker — feeding CreateConversation. Tests: Projects()
+  dedupe/counts/scratch-exclusion/label edge cases; frontend exercised
+  on a real machine per the Step 10 caveat.
 
 - [ ] **Step 17 — Promote conversation to project & move between
   projects.** A scratch conversation can become a project; conversations

@@ -19,15 +19,16 @@
 
       <form id="new-form" hidden>
         <input id="new-title" placeholder="Conversation title" autocomplete="off" />
-        <div class="row">
-          <input id="new-repo" placeholder="Git repo path (optional)" autocomplete="off" />
+        <select id="new-project" aria-label="Project"></select>
+        <div class="row" id="new-repo-row" hidden>
+          <input id="new-repo" placeholder="Git repo path" autocomplete="off" />
           <button type="button" id="pick-repo" title="Choose a repository">…</button>
         </div>
         <div class="row">
           <button type="submit">Create</button>
           <button type="button" id="new-cancel" class="ghost">Cancel</button>
         </div>
-        <p class="hint">Leave the repo blank for a scratch workspace. Every turn is snapshotted either way.</p>
+        <p class="hint">No project = a scratch workspace. Every turn is snapshotted either way.</p>
       </form>
 
       <nav id="conversations" aria-label="Conversations"></nav>

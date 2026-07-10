@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -142,6 +144,44 @@ func (a *App) Adapters() ([]AdapterInfo, error) {
 // Conversations returns all conversations, newest first.
 func (a *App) Conversations() ([]*transcript.Conversation, error) {
 	return a.store.ListConversations(a.ctx)
+}
+
+// Projects returns the distinct known projects derived from
+// conversations (path, basename label, conversation count) — no separate
+// registry; conversations are the source of truth.
+func (a *App) Projects() ([]transcript.Project, error) {
+	convs, err := a.store.ListConversations(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return transcript.Projects(convs), nil
+}
+
+// UIState returns the persisted frontend state JSON ("{}" when none was
+// saved yet). Backed by <data>/ui-state.json — the webview's localStorage
+// is not reliable across platforms.
+func (a *App) UIState() (string, error) {
+	b, err := os.ReadFile(filepath.Join(a.store.Root(), "ui-state.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return "{}", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// SetUIState persists the frontend state JSON.
+func (a *App) SetUIState(s string) error {
+	if !json.Valid([]byte(s)) {
+		return fmt.Errorf("ui state is not valid JSON")
+	}
+	path := filepath.Join(a.store.Root(), "ui-state.json")
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(s), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // Turns returns a conversation's turns in order.

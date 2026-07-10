@@ -74,7 +74,8 @@ button.ghost { background: transparent; }
 button:disabled { opacity: 0.45; cursor: default; }
 
 #new-form { padding: 0 14px 12px; display: grid; gap: 8px; }
-#new-form input {
+#new-form input,
+#new-form select {
   width: 100%;
   background: var(--ink);
   border: 1px solid var(--line);
@@ -86,16 +87,32 @@ button:disabled { opacity: 0.45; cursor: default; }
 #new-form .hint { margin: 0; color: var(--muted); font-size: 12px; }
 
 #conversations { flex: 1; overflow-y: auto; padding: 4px 8px 12px; }
-#conversations .project {
-  margin: 12px 6px 4px;
+#conversations .project-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 10px 0 2px;
+  padding: 4px 6px;
+  border-radius: 6px;
   color: var(--muted);
   font: 600 10.5px/1.2 var(--mono);
   letter-spacing: 0.09em;
   text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+}
+#conversations .project-head:hover { background: var(--panel-2); }
+#conversations .project-head .caret { width: 1em; }
+#conversations .project-head .label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+#conversations .project-head .count {
+  margin-left: auto;
+  font-weight: 400;
+}
+#conversations .conv.grouped { padding-left: 21px; }
 #conversations .conv {
   position: relative;
   display: block;

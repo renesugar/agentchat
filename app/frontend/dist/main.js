@@ -13,6 +13,7 @@ const state = {
   current: null,      // Conversation
   running: false,
   liveTurnEl: null,   // element receiving streamed events
+  collapsed: {},      // project path -> true (persisted via UIState)
 };
 
 /* ---------- helpers ---------- */
@@ -106,39 +107,78 @@ function refreshModels() {
 
 async function loadConversations(selectID) {
   state.conversations = (await api().Conversations()) || [];
-
-  const nav = $("conversations");
-  nav.replaceChildren();
-
-  // Group by project path; scratch conversations last.
-  const groups = new Map();
-  for (const c of state.conversations) {
-    const key = c.project_path || "";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(c);
-  }
-  const keys = [...groups.keys()].sort((a, b) =>
-    (a === "") - (b === "") || a.localeCompare(b));
-
-  for (const key of keys) {
-    nav.append(el("div", "project", projectLabel(key)));
-    for (const c of groups.get(key)) {
-      const btn = el("div", "conv");
-      btn.tabIndex = 0;
-      btn.setAttribute("role", "button");
-      btn.append(el("span", "", c.title), el("span", "when", fmtWhen(c.updated_at)));
-      btn.onclick = () => openConversation(c);
-      if (state.current && state.current.id === c.id) btn.classList.add("active");
-      btn.dataset.id = c.id;
-      btn.append(deleteButton(c));
-      nav.append(btn);
-    }
-  }
+  renderConversations();
 
   if (selectID) {
     const c = state.conversations.find((x) => x.id === selectID);
     if (c) await openConversation(c);
   }
+}
+
+// renderConversations draws the sidebar: collapsible project groups
+// first, then conversations without a project as plain top-level items.
+function renderConversations() {
+  const nav = $("conversations");
+  nav.replaceChildren();
+
+  const groups = new Map();
+  const loose = [];
+  for (const c of state.conversations) {
+    if (c.project_path) {
+      if (!groups.has(c.project_path)) groups.set(c.project_path, []);
+      groups.get(c.project_path).push(c);
+    } else {
+      loose.push(c);
+    }
+  }
+  const keys = [...groups.keys()].sort((a, b) =>
+    projectLabel(a).localeCompare(projectLabel(b)) || a.localeCompare(b));
+
+  for (const key of keys) {
+    const convs = groups.get(key);
+    const collapsed = !!state.collapsed[key];
+
+    const head = el("div", "project-head");
+    head.tabIndex = 0;
+    head.setAttribute("role", "button");
+    head.setAttribute("aria-expanded", String(!collapsed));
+    head.title = key;
+    head.append(el("span", "caret", collapsed ? "▸" : "▾"));
+    head.append(el("span", "label", projectLabel(key)));
+    head.append(el("span", "count", String(convs.length)));
+    head.onclick = () => toggleProject(key);
+    head.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") toggleProject(key); };
+    nav.append(head);
+
+    if (!collapsed) for (const c of convs) nav.append(convItem(c, true));
+  }
+
+  for (const c of loose) nav.append(convItem(c, false));
+}
+
+function convItem(c, grouped) {
+  const btn = el("div", "conv");
+  if (grouped) btn.classList.add("grouped");
+  btn.tabIndex = 0;
+  btn.setAttribute("role", "button");
+  btn.append(el("span", "", c.title), el("span", "when", fmtWhen(c.updated_at)));
+  btn.onclick = () => openConversation(c);
+  if (state.current && state.current.id === c.id) btn.classList.add("active");
+  btn.dataset.id = c.id;
+  btn.append(deleteButton(c));
+  return btn;
+}
+
+function toggleProject(path) {
+  if (state.collapsed[path]) delete state.collapsed[path];
+  else state.collapsed[path] = true;
+  renderConversations();
+  saveUIState();
+}
+
+function saveUIState() {
+  api().SetUIState(JSON.stringify({ collapsedProjects: state.collapsed }))
+    .catch(() => {}); // cosmetic state; losing it is not worth a toast
 }
 
 // deleteButton is a two-click delete control: the first click arms it
@@ -440,10 +480,38 @@ async function exportBundle() {
 
 /* ---------- new conversation ---------- */
 
+// openNewForm toggles the creation form and (re)populates its project
+// select from the known projects.
+async function openNewForm() {
+  const f = $("new-form");
+  f.hidden = !f.hidden;
+  if (f.hidden) return;
+  $("new-title").focus();
+
+  const sel = $("new-project");
+  sel.replaceChildren();
+  sel.append(new Option("No project (scratch)", ""));
+  try {
+    for (const p of (await api().Projects()) || []) {
+      sel.append(new Option(`${p.label} — ${p.path}`, p.path));
+    }
+  } catch (err) {
+    toast(String(err));
+  }
+  sel.append(new Option("Other repo…", "__other__"));
+  sel.value = "";
+  updateRepoRow();
+}
+
+function updateRepoRow() {
+  $("new-repo-row").hidden = $("new-project").value !== "__other__";
+}
+
 async function createConversation(evSubmit) {
   evSubmit.preventDefault();
   const title = $("new-title").value.trim() || "Untitled";
-  const repo = $("new-repo").value.trim();
+  const choice = $("new-project").value;
+  const repo = choice === "__other__" ? $("new-repo").value.trim() : choice;
   try {
     const conv = await api().CreateConversation(title, repo);
     $("new-form").hidden = true;
@@ -458,13 +526,10 @@ async function createConversation(evSubmit) {
 /* ---------- wiring ---------- */
 
 window.addEventListener("DOMContentLoaded", async () => {
-  $("new-conv").onclick = () => {
-    const f = $("new-form");
-    f.hidden = !f.hidden;
-    if (!f.hidden) $("new-title").focus();
-  };
+  $("new-conv").onclick = openNewForm;
   $("new-cancel").onclick = () => { $("new-form").hidden = true; };
   $("new-form").onsubmit = createConversation;
+  $("new-project").onchange = updateRepoRow;
   $("import-bundle").onclick = importBundle;
   $("pick-repo").onclick = async () => {
     try {
@@ -490,6 +555,13 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("export-zip").onclick = exportBundle;
 
   window.runtime.EventsOn("turn-event", onTurnEvent);
+
+  try {
+    const ui = JSON.parse(await api().UIState());
+    state.collapsed = ui.collapsedProjects || {};
+  } catch {
+    state.collapsed = {};
+  }
 
   await loadAdapters();
   await loadConversations();

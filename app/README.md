@@ -49,6 +49,10 @@ Go 1.26.
   copy button in the transcript)
 - `DeleteConversation(conv)` — removes turns+events (artifacts kept);
   refused while a turn is running
+- `Projects()` — distinct projects derived from conversations
+  ({path, label, count}); feeds the sidebar groups and creation picker
+- `UIState()` / `SetUIState(json)` — persisted frontend state
+  (`<data>/ui-state.json`; e.g. which project groups are collapsed)
 - `ImportBundle()` — open-dialog restore of an exported bundle; refuses
   ID collisions, associates a restored workspace for this session
 - `Artifacts(conv)` — the conversation's artifact records
