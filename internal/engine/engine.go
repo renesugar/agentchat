@@ -8,10 +8,15 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/example/agentchat/internal/adapter"
+	"github.com/example/agentchat/internal/mcpserver"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -20,6 +25,17 @@ import (
 type Engine struct {
 	Registry *adapter.Registry
 	Store    transcript.Store
+
+	// MCP, when non-nil, is the app's callback server (Step 12): each
+	// turn gets a token-scoped channel and MCP-capable clients can push
+	// progress/artifacts straight into the turn's event stream. Optional
+	// by design — output capture stays the baseline transport.
+	MCP *mcpserver.Server
+	// ArtifactSink stores a file pushed through the MCP add_artifact
+	// tool and returns the artifact ID. nil (or a nil MCP) makes the
+	// tool report that artifact storage is unavailable. path is already
+	// resolved and confined to the turn's workspace.
+	ArtifactSink func(ctx context.Context, convID, turnID, path, note string) (string, error)
 }
 
 // New returns an Engine over reg and store.
@@ -70,15 +86,42 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 
 	// Persist every event; remember the first storage failure without
 	// aborting the client run (the adapter cannot be interrupted safely
-	// through emit, and partial persistence still has value).
-	var storeErr error
+	// through emit, and partial persistence still has value). The mutex
+	// serializes the adapter's emits with MCP pushes, which arrive on
+	// HTTP handler goroutines.
+	var (
+		emitMu   sync.Mutex
+		storeErr error
+	)
 	emit := func(ev adapter.Event) {
+		emitMu.Lock()
+		defer emitMu.Unlock()
 		if err := e.Store.AppendEvent(ctx, convID, turn.ID, ev); err != nil && storeErr == nil {
 			storeErr = err
 		}
 		if tap != nil {
 			tap(ev)
 		}
+	}
+
+	// Open the turn's MCP callback channel; the token dies with the turn.
+	if e.MCP != nil && req.MCP == nil {
+		workDir := req.WorkDir
+		ch := e.MCP.Register(mcpserver.Sink{
+			Emit: emit,
+			AddArtifact: func(path, note string) (string, error) {
+				if e.ArtifactSink == nil {
+					return "", errors.New("artifact storage not configured")
+				}
+				resolved, err := resolveInWorkspace(workDir, path)
+				if err != nil {
+					return "", err
+				}
+				return e.ArtifactSink(ctx, convID, turn.ID, resolved, note)
+			},
+		})
+		defer ch.Close()
+		req.MCP = &adapter.MCPServerInfo{Name: "agentchat", URL: e.MCP.URL(), Token: ch.Token}
 	}
 
 	res, runErr := a.RunTurn(ctx, req, emit)
@@ -110,4 +153,24 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 	default:
 		return finished, runErr
 	}
+}
+
+// resolveInWorkspace resolves an MCP-supplied artifact path against the
+// turn's workspace and refuses paths that escape it — the client already
+// has free rein inside the workspace, but the callback channel must not
+// become a way to read arbitrary files from the host.
+func resolveInWorkspace(workDir, path string) (string, error) {
+	if workDir == "" {
+		return "", errors.New("no workspace for this turn")
+	}
+	p := path
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(workDir, p)
+	}
+	p = filepath.Clean(p)
+	rel, err := filepath.Rel(workDir, p)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q is outside the workspace", path)
+	}
+	return p, nil
 }

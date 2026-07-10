@@ -154,6 +154,33 @@ func TestBuildArgs(t *testing.T) {
 	}
 }
 
+func TestBuildArgsMCP(t *testing.T) {
+	mcp := &adapter.MCPServerInfo{Name: "agentchat", URL: "http://127.0.0.1:9999/mcp", Token: "tok123"}
+
+	got := buildArgs(adapter.TurnRequest{Prompt: "go", SessionID: "0199-abc", MCP: mcp})
+	want := []string{"exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check",
+		"-c", `mcp_servers.agentchat.url="http://127.0.0.1:9999/mcp"`,
+		"-c", `mcp_servers.agentchat.bearer_token_env_var="AGENTCHAT_MCP_TOKEN"`,
+		"resume", "0199-abc", "-"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mcp args:\n got %v\nwant %v", got, want)
+	}
+
+	// The token travels via the environment, never argv.
+	for _, a := range got {
+		if strings.Contains(a, "tok123") {
+			t.Errorf("token leaked into argv: %v", got)
+		}
+	}
+	env := mcpEnv(adapter.TurnRequest{MCP: mcp})
+	if !reflect.DeepEqual(env, []string{"AGENTCHAT_MCP_TOKEN=tok123"}) {
+		t.Errorf("mcpEnv = %v", env)
+	}
+	if mcpEnv(adapter.TurnRequest{}) != nil {
+		t.Error("mcpEnv without MCP should be nil")
+	}
+}
+
 // TestRunTurnWithStubBinary exercises RunTurn's process handling using a
 // shell script that replays a fixture — never the real client. It also
 // verifies the prompt arrives on stdin.

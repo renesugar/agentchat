@@ -2,6 +2,7 @@ package claudecode
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -143,6 +144,56 @@ func TestBuildArgs(t *testing.T) {
 	for _, a := range got {
 		if a == "--permission-mode" {
 			t.Errorf("empty permission_mode should omit the flag: %v", got)
+		}
+	}
+}
+
+func TestBuildArgsMCP(t *testing.T) {
+	got := buildArgs(adapter.TurnRequest{Prompt: "go", MCP: &adapter.MCPServerInfo{
+		Name: "agentchat", URL: "http://127.0.0.1:9999/mcp", Token: "tok123",
+	}})
+
+	// The inline --mcp-config JSON must round-trip to the http server spec.
+	var cfgJSON string
+	for i, a := range got {
+		if a == "--mcp-config" && i+1 < len(got) {
+			cfgJSON = got[i+1]
+		}
+	}
+	if cfgJSON == "" {
+		t.Fatalf("no --mcp-config in %v", got)
+	}
+	var cfg struct {
+		MCPServers map[string]struct {
+			Type    string            `json:"type"`
+			URL     string            `json:"url"`
+			Headers map[string]string `json:"headers"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(cfgJSON), &cfg); err != nil {
+		t.Fatalf("parsing %q: %v", cfgJSON, err)
+	}
+	srv, ok := cfg.MCPServers["agentchat"]
+	if !ok || srv.Type != "http" || srv.URL != "http://127.0.0.1:9999/mcp" ||
+		srv.Headers["Authorization"] != "Bearer tok123" {
+		t.Errorf("mcp config = %+v", cfg)
+	}
+
+	// The server's tools must be pre-approved (print mode cannot prompt).
+	allowed := ""
+	for i, a := range got {
+		if a == "--allowedTools" && i+1 < len(got) {
+			allowed = got[i+1]
+		}
+	}
+	if allowed != "mcp__agentchat" {
+		t.Errorf("allowedTools = %q, want mcp__agentchat", allowed)
+	}
+
+	// Without MCP neither flag appears.
+	for _, a := range buildArgs(adapter.TurnRequest{Prompt: "go"}) {
+		if a == "--mcp-config" || a == "--allowedTools" {
+			t.Errorf("unexpected %s without req.MCP", a)
 		}
 	}
 }

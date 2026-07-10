@@ -29,6 +29,7 @@ import (
 	"github.com/example/agentchat/internal/config"
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/export"
+	"github.com/example/agentchat/internal/mcpserver"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -54,6 +55,7 @@ func run() error {
 		exportMD  = flag.String("export-md", "", "write a markdown transcript of -conv to this file, then exit")
 		exportZip = flag.String("export-bundle", "", "write a ZIP bundle of -conv (transcript+artifacts[+workspace via -dir]) to this file, then exit")
 		asJSON    = flag.Bool("json", false, "print events as JSON lines")
+		useMCP    = flag.Bool("mcp", true, "expose the MCP callback channel (loopback) to MCP-capable clients")
 		listOnly  = flag.Bool("list", false, "list adapters and models, then exit")
 		listConvs = flag.Bool("conversations", false, "list stored conversations, then exit")
 	)
@@ -195,6 +197,28 @@ func run() error {
 	set.Prepare(*client, &req)
 
 	eng := engine.New(set.Registry, store)
+	if *useMCP {
+		srv, err := mcpserver.Start()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "mcp callback disabled: %v\n", err)
+		} else {
+			defer srv.Close()
+			eng.MCP = srv
+			lib, err := artifact.NewLibrary(filepath.Join(store.Root(), "artifacts"))
+			if err != nil {
+				return err
+			}
+			eng.ArtifactSink = func(ctx context.Context, convID, turnID, path, note string) (string, error) {
+				art, err := lib.AddFileFromPath(ctx, path, "", artifact.Meta{
+					ConversationID: convID, TurnID: turnID, Origin: "mcp", Note: note,
+				})
+				if err != nil {
+					return "", err
+				}
+				return art.ID, nil
+			}
+		}
+	}
 	turn, err := eng.RunTurn(ctx, id, *client, ws, req, tap)
 	if err != nil {
 		return err

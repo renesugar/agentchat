@@ -15,6 +15,7 @@ package claudecode
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -77,6 +78,25 @@ func buildArgs(req adapter.TurnRequest) []string {
 	}
 	if mode != "" {
 		args = append(args, "--permission-mode", mode)
+	}
+	if req.MCP != nil {
+		// Inline JSON config for the app's callback server (verified on
+		// claude 2.1.206: --mcp-config accepts JSON strings). Allowing
+		// the bare server name (mcp__<name>) pre-approves its tools,
+		// which -p mode could never prompt for.
+		cfg, _ := json.Marshal(map[string]any{
+			"mcpServers": map[string]any{
+				req.MCP.Name: map[string]any{
+					"type": "http",
+					"url":  req.MCP.URL,
+					"headers": map[string]string{
+						"Authorization": "Bearer " + req.MCP.Token,
+					},
+				},
+			},
+		})
+		args = append(args, "--mcp-config", string(cfg),
+			"--allowedTools", "mcp__"+req.MCP.Name)
 	}
 	// "--" guards against prompts that begin with a dash.
 	return append(args, "--", req.Prompt)

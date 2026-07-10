@@ -16,6 +16,7 @@ import (
 	"github.com/example/agentchat/internal/config"
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/export"
+	"github.com/example/agentchat/internal/mcpserver"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -28,6 +29,7 @@ type App struct {
 	mgr   *workspace.Manager
 	set   *clients.Set
 	eng   *engine.Engine
+	mcp   *mcpserver.Server // nil if the callback channel failed to start
 
 	mu       sync.Mutex
 	wsByConv map[string]*workspace.Workspace
@@ -67,7 +69,7 @@ func NewApp(dataDir string) (*App, error) {
 	}
 	set := clients.New(cfg)
 
-	return &App{
+	app := &App{
 		store:    store,
 		lib:      lib,
 		mgr:      mgr,
@@ -75,10 +77,34 @@ func NewApp(dataDir string) (*App, error) {
 		eng:      engine.New(set.Registry, store),
 		wsByConv: make(map[string]*workspace.Workspace),
 		running:  make(map[string]bool),
-	}, nil
+	}
+
+	// MCP callback channel (Step 12): best-effort — if the loopback
+	// listener can't start, turns still work via output capture.
+	if srv, err := mcpserver.Start(); err == nil {
+		app.mcp = srv
+		app.eng.MCP = srv
+		app.eng.ArtifactSink = func(ctx context.Context, convID, turnID, path, note string) (string, error) {
+			art, err := lib.AddFileFromPath(ctx, path, "", artifact.Meta{
+				ConversationID: convID, TurnID: turnID, Origin: "mcp", Note: note,
+			})
+			if err != nil {
+				return "", err
+			}
+			return art.ID, nil
+		}
+	}
+
+	return app, nil
 }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+
+func (a *App) shutdown(ctx context.Context) {
+	if a.mcp != nil {
+		_ = a.mcp.Close()
+	}
+}
 
 // --- adapters ---
 

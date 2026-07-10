@@ -39,6 +39,25 @@ type TurnRequest struct {
 	Env []string
 	// Extra carries adapter-specific options without widening this struct.
 	Extra map[string]string
+	// MCP, when non-nil, points the client at the app's MCP callback
+	// server so it can push progress/artifacts directly during the turn.
+	// Adapters for clients without MCP support ignore it; output capture
+	// remains the baseline transport either way.
+	MCP *MCPServerInfo
+}
+
+// MCPServerInfo describes the app's per-turn MCP callback endpoint
+// (streamable HTTP on loopback, authenticated by a turn-scoped bearer
+// token). Filled in by the engine when an MCP server is configured.
+type MCPServerInfo struct {
+	// Name is the MCP server name the client sees (tool names become
+	// e.g. mcp__<name>__progress in Claude Code).
+	Name string
+	// URL is the streamable-HTTP endpoint, e.g. "http://127.0.0.1:PORT/mcp".
+	URL string
+	// Token authorizes exactly this turn's channel ("Authorization:
+	// Bearer <token>"); it is revoked when the turn finishes.
+	Token string
 }
 
 // EmitFunc receives normalized events as the turn progresses. Adapters call

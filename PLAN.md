@@ -151,10 +151,26 @@ in a compiling state**.
   load/validation, expansion, apply precedence, model merging, and
   binary overrides.
 
-- [ ] **Step 12 (optional) — MCP callback channel.** Expose an MCP server
-  from the app so clients that support MCP (Claude Code, Codex) can push
-  progress/artifacts directly. Output capture from Steps 3–6 remains the
-  baseline; MCP is an enhancement, never a requirement.
+- [x] **Step 12 (optional) — MCP callback channel.** `internal/mcpserver`:
+  a stdlib-only MCP server (streamable HTTP, JSON-RPC over POST on a
+  loopback listener) with two tools — `progress` (→ thinking event in
+  the live turn stream) and `add_artifact` (→ artifact library, path
+  confined to the workspace). Each turn gets a token-scoped channel
+  (Authorization: Bearer; revoked when the turn ends) whose pushes flow
+  through the engine's per-turn emit — persisted and streamed like any
+  adapter event (emit is now mutex-serialized since MCP calls arrive on
+  HTTP goroutines). `TurnRequest.MCP` carries {name,url,token}; the
+  claude adapter maps it to `--mcp-config <inline json>` +
+  `--allowedTools mcp__agentchat`, codex to `-c mcp_servers.agentchat.
+  url/bearer_token_env_var` with the token in the env. aider/swival/echo
+  ignore it — output capture stays the baseline, MCP is never required.
+  Engine gains optional `MCP`/`ArtifactSink` fields; CLI wires them
+  behind `-mcp` (default on), the app in NewApp (artifact origin
+  "mcp"). Tests: mcpserver protocol suite, per-adapter buildArgs, and
+  an engine round trip with a fake MCP-client adapter (progress event
+  persisted, artifact path resolution + workspace-escape refusal, token
+  revocation). Verified live: claude 2.1.206 called both tools over the
+  channel end to end (docs/adapters.md).
 
 - [ ] **Step 13 — Effort control.** Make reasoning effort a first-class
   per-turn setting alongside the model (may be implemented before Step 12).

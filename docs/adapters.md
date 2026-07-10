@@ -34,6 +34,13 @@ and update this file in the same commit.
   stream line types `rate_limit_event` and `system/thinking_tokens`
   appear and are ignored (unknown types are skipped by design) — no
   fixture drift. `--effort <level>` exists at launch (Step 13).
+- MCP callback (Step 12): when the engine provides a channel, the
+  adapter adds `--mcp-config '{"mcpServers":{"agentchat":{"type":"http",
+  "url":..., "headers":{"Authorization":"Bearer <token>"}}}}'` and
+  `--allowedTools mcp__agentchat` (bare server name pre-approves its
+  tools; -p mode cannot prompt). ✅ Verified live on claude 2.1.206:
+  the client called both `mcp__agentchat__progress` and
+  `mcp__agentchat__add_artifact` end to end.
 
 ## codex (Codex CLI) — Step 4 ✅ implemented, ✅ verified live against codex-cli 0.142.5 (2026-07-10)
     codex exec --json --sandbox workspace-write --skip-git-repo-check \
@@ -68,6 +75,13 @@ and update this file in the same commit.
   code -32600) instead of silently starting a new session — the turn
   errors and the transcript keeps the old session, which is the better
   outcome for continuity.
+- MCP callback (Step 12): `-c mcp_servers.agentchat.url="<url>" -c
+  mcp_servers.agentchat.bearer_token_env_var="AGENTCHAT_MCP_TOKEN"`
+  with the token passed through the environment, never argv (keys per
+  `codex mcp add --url/--bearer-token-env-var` on 0.142.5). Flags sit
+  before a possible `resume` subcommand; `resume` re-defines `-c`, so
+  both placements parse. Config-level, so MCP tools need no
+  per-tool approval in exec mode.
 
 ## aider — Step 5 ✅ implemented, ✅ flags verified against aider 0.86.2 (2026-07-10)
     aider --message "<prompt>" --yes-always --no-stream --no-pretty \

@@ -80,10 +80,35 @@ func buildArgs(req adapter.TurnRequest) []string {
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	if req.MCP != nil {
+		// Streamable-HTTP MCP server via config overrides (verified on
+		// codex-cli 0.142.5: `codex mcp add --url/--bearer-token-env-var`
+		// writes exactly these keys). The token itself goes through the
+		// environment (see mcpEnv), never the command line. Placed before
+		// a possible `resume` subcommand — exec-level flags there parse
+		// fine and `resume` re-defines -c as well.
+		args = append(args,
+			"-c", fmt.Sprintf("mcp_servers.%s.url=%q", req.MCP.Name, req.MCP.URL),
+			"-c", fmt.Sprintf("mcp_servers.%s.bearer_token_env_var=%q", req.MCP.Name, mcpTokenEnv),
+		)
+	}
 	if req.SessionID != "" {
 		args = append(args, "resume", req.SessionID)
 	}
 	return append(args, "-")
+}
+
+// mcpTokenEnv is the environment variable codex reads the callback
+// bearer token from (referenced via bearer_token_env_var in buildArgs).
+const mcpTokenEnv = "AGENTCHAT_MCP_TOKEN"
+
+// mcpEnv returns the extra environment entries for the MCP callback
+// channel, if one is configured for this turn.
+func mcpEnv(req adapter.TurnRequest) []string {
+	if req.MCP == nil {
+		return nil
+	}
+	return []string{mcpTokenEnv + "=" + req.MCP.Token}
 }
 
 // RunTurn implements adapter.Adapter.
@@ -92,7 +117,7 @@ func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit ada
 
 	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req)...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = append(os.Environ(), req.Env...)
+	cmd.Env = append(append(os.Environ(), req.Env...), mcpEnv(req)...)
 	cmd.Stdin = strings.NewReader(req.Prompt)
 
 	stdout, err := cmd.StdoutPipe()
