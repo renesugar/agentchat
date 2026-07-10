@@ -253,6 +253,61 @@ in a compiling state**.
     conversation.json mtime/content unchanged); old-format bundle →
     clear rejection; artifact blob dedupe on import.
 
+- [ ] **Step 16 — Sidebar project groups & creation picker.** Make project
+  grouping first-class in the UI (Firefox-tab-group interaction model).
+  - GUI sidebar: each project renders as a collapsible group — a header
+    row (disclosure caret + project name + conversation count) that
+    toggles the group open/closed on click. Conversations with no
+    project are NOT grouped: they render as individual top-level items
+    interleaved after the project groups (replace the current lumped
+    "Scratch" header). Collapse state persists across sessions via small
+    App bindings `UIState()`/`SetUIState(json)` backed by
+    `<data>/ui-state.json` (avoid webview localStorage quirks).
+  - Backend: `App.Projects()` returning distinct known projects derived
+    from conversations — `{path, label (basename), count}` — no separate
+    project registry; conversations remain the source of truth.
+  - New-conversation form: a project select populated from Projects():
+    "No project (scratch)", one entry per known project, and "Other
+    repo…" which reveals the existing path input + directory picker.
+    Selecting a known project passes its path to CreateConversation
+    (which already handles it).
+  - Tests: Projects() derivation (dedupe, counts, scratch excluded);
+    frontend logic is exercised on a real machine per Step 10's caveat.
+
+- [ ] **Step 17 — Promote conversation to project & move between
+  projects.** A scratch conversation can become a project; conversations
+  can be re-associated with existing projects.
+  - Store: add `SetConversationProject(ctx, id, projectPath string)` to
+    the Store interface + FSStore (updates conversation.json, bumps
+    UpdatedAt; empty path detaches). Tests.
+  - Workspace: `Manager.PromoteScratch(ctx, ws, targetDir)` — relocate a
+    scratch workspace to a user-chosen directory as the project repo.
+    Requirements: targetDir must not exist (or be empty); move the whole
+    directory INCLUDING .git — a plain directory move, not `git clone`,
+    so the refs/agentchat snapshot chain and turn SnapshotIDs stay valid
+    (rename when same filesystem, copy+verify+remove across
+    filesystems); returned workspace has Kind repo and the new Dir.
+    Refuse for non-scratch kinds. Test asserts snapshot refs and
+    Diff(oldSnapshotID, ...) still work in the new location.
+  - App bindings + GUI:
+    - "Create project from this conversation…" action on a scratch
+      conversation (native directory save dialog → PromoteScratch →
+      SetConversationProject → refresh workspace cache and sidebar; the
+      conversation now appears under its new project group, and the new
+      project is offered in the Step 16 creation picker).
+    - "Move to project…" on any conversation (choose from Projects() or
+      pick a repo): calls SetConversationProject only; future turns
+      resolve to the project repo via workspaceFor (which already
+      prefers ProjectPath) — prior turns keep their historical
+      WorkspaceRefs/SnapshotIDs untouched. If the conversation had a
+      scratch workspace, it is left in place as history (a later cleanup
+      step may offer removal).
+  - CLI: `-set-project <path>` and `-promote <targetDir>` with `-conv`.
+  - Update ARCHITECTURE.md workspace-kind notes to describe promotion.
+  - Tests: store update round trip; promote preserves snapshots; moving
+    a conversation changes grouping and future workspace resolution
+    (engine test: next turn runs in the project repo).
+
 ## Definition of done for any step
 
 1. `make check` passes (fmt, vet, test).
