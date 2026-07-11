@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/example/agentchat/internal/adapter"
@@ -102,6 +105,61 @@ func NewApp(dataDir string) (*App, error) {
 }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+
+// applicationMenu builds the native menu bar. Items emit the Wails event
+// "menu" with an action string the frontend dispatches on — the same
+// code paths the old always-visible buttons used.
+func (a *App) applicationMenu() *menu.Menu {
+	emit := func(action string) func(*menu.CallbackData) {
+		return func(*menu.CallbackData) { runtime.EventsEmit(a.ctx, "menu", action) }
+	}
+
+	root := menu.NewMenu()
+
+	file := root.AddSubmenu("File")
+	file.AddText("New Conversation…", keys.CmdOrCtrl("n"), emit("new-conversation"))
+	file.AddText("Import Bundle…", keys.CmdOrCtrl("o"), emit("import-bundle"))
+	file.AddSeparator()
+	file.AddText("Export Transcript…", keys.CmdOrCtrl("s"), emit("export-md"))
+	file.AddText("Export Bundle…", keys.Combo("s", keys.CmdOrCtrlKey, keys.ShiftKey), emit("export-bundle"))
+	file.AddSeparator()
+	file.AddText("Settings…", keys.CmdOrCtrl(","), emit("settings"))
+	file.AddSeparator()
+	file.AddText("Quit", keys.CmdOrCtrl("q"), func(*menu.CallbackData) { runtime.Quit(a.ctx) })
+
+	// The Edit role menu (native copy/paste items) is meaningful on
+	// macOS; Linux/Windows webviews handle the shortcuts natively.
+	if goruntime.GOOS == "darwin" {
+		root.Append(menu.EditMenu())
+	}
+
+	view := root.AddSubmenu("View")
+	view.AddText("Toggle Artifacts", keys.CmdOrCtrl("l"), emit("toggle-artifacts"))
+	view.AddSeparator()
+	view.AddText("Reload UI", keys.Key("f5"), func(*menu.CallbackData) { runtime.WindowReload(a.ctx) })
+
+	help := root.AddSubmenu("Help")
+	help.AddText("About AgentChat", nil, emit("about"))
+
+	return root
+}
+
+// AppInfo is what the Settings dialog shows.
+type AppInfo struct {
+	DataDir    string `json:"dataDir"`
+	ConfigPath string `json:"configPath"`
+	ThemesDir  string `json:"themesDir"`
+}
+
+// Info returns the app's key paths for the (read-only) Settings dialog.
+func (a *App) Info() AppInfo {
+	root := a.store.Root()
+	return AppInfo{
+		DataDir:    root,
+		ConfigPath: filepath.Join(root, "config.json"),
+		ThemesDir:  filepath.Join(root, "themes"),
+	}
+}
 
 func (a *App) shutdown(ctx context.Context) {
 	if a.mcp != nil {

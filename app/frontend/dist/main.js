@@ -480,6 +480,12 @@ function onTurnEvent(payload) {
 
 /* ---------- artifacts & export ---------- */
 
+function toggleArtifacts() {
+  const panel = $("artifact-panel");
+  if (panel.hidden) showArtifacts();
+  else panel.hidden = true;
+}
+
 async function showArtifacts() {
   if (!state.current) return;
   const list = $("artifact-list");
@@ -529,6 +535,70 @@ async function exportBundle() {
     if (path) toast(`saved ${path}`);
   } catch (err) {
     toast(String(err));
+  }
+}
+
+/* ---------- settings & about dialogs ---------- */
+
+async function openSettings() {
+  const paths = $("settings-paths");
+  paths.replaceChildren();
+  try {
+    const info = await api().Info();
+    for (const [label, value] of [
+      ["Data directory", info.dataDir],
+      ["Config file", info.configPath],
+      ["Themes directory", info.themesDir],
+    ]) {
+      paths.append(el("dt", "", label), el("dd", "", value));
+    }
+  } catch (err) {
+    paths.append(el("dt", "", "error"), el("dd", "", String(err)));
+  }
+
+  const adapters = $("settings-adapters");
+  adapters.replaceChildren();
+  for (const a of state.adapters) {
+    const row = el("div", a.available ? "ok" : "off");
+    row.append(el("i", "", a.available ? "●" : "○"), document.createTextNode(" " + a.name));
+    if (!a.available) row.append(el("span", "detail", a.detail || "not found on PATH"));
+    adapters.append(row);
+  }
+
+  $("settings-dialog").showModal();
+}
+
+/* ---------- native menu dispatch ---------- */
+
+function onMenu(action) {
+  switch (action) {
+    case "new-conversation": {
+      const f = $("new-form");
+      if (f.hidden) openNewForm();
+      else $("new-title").focus();
+      break;
+    }
+    case "import-bundle":
+      importBundle();
+      break;
+    case "export-md":
+      if (!state.current) { toast("open a conversation to export it"); break; }
+      exportMarkdown();
+      break;
+    case "export-bundle":
+      if (!state.current) { toast("open a conversation to export it"); break; }
+      exportBundle();
+      break;
+    case "toggle-artifacts":
+      if (!state.current) { toast("open a conversation to see its artifacts"); break; }
+      toggleArtifacts();
+      break;
+    case "settings":
+      openSettings();
+      break;
+    case "about":
+      $("about-dialog").showModal();
+      break;
   }
 }
 
@@ -639,7 +709,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("new-cancel").onclick = () => { $("new-form").hidden = true; };
   $("new-form").onsubmit = createConversation;
   $("new-project").onchange = updateRepoRow;
-  $("import-bundle").onclick = importBundle;
   $("pick-repo").onclick = async () => {
     try {
       const dir = await api().PickRepoDirectory();
@@ -662,13 +731,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("move-form").onsubmit = moveConversation;
   $("move-cancel").onclick = () => { $("move-form").hidden = true; };
 
-  $("show-artifacts").onclick = showArtifacts;
   $("close-artifacts").onclick = () => { $("artifact-panel").hidden = true; };
   $("attach-file").onclick = attachFile;
-  $("export-md").onclick = exportMarkdown;
-  $("export-zip").onclick = exportBundle;
 
   window.runtime.EventsOn("turn-event", onTurnEvent);
+  window.runtime.EventsOn("menu", onMenu);
 
   try {
     const ui = JSON.parse(await api().UIState());

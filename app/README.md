@@ -37,6 +37,7 @@ Go 1.26.
 `app.go` is a thin binding layer over the headless engine:
 
 - `Adapters()` — clients + availability + model lists
+- `Info()` — data dir / config / themes paths for the Settings dialog
 - `Conversations()`, `Turns(conv)`, `Events(conv, turn)` — transcript reads
 - `CreateConversation(title, repoPath)` — repoPath "" → managed scratch
   workspace; a git repo path → snapshot-managed repo workspace
@@ -70,3 +71,9 @@ Go 1.26.
 Workspace resolution per conversation: cached handle → the conversation's
 project repo → the last turn's workspace dir (reopened) → a fresh scratch
 workspace. All turns are snapshotted by the engine (see ARCHITECTURE.md).
+
+The native menu bar (File / View / Help, built in app.go) emits the Wails
+event `menu` with an action string the frontend dispatches on: import and
+export live under File, the artifact overlay toggle under View, and
+Settings (theme picker, paths, client availability) is an in-page
+`<dialog>` opened from File → Settings.

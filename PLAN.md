@@ -323,26 +323,29 @@ in a compiling state**.
   Recipes in config.example.json; note in adapters.md. Tests: config
   merge/replace/dedupe, Set.Efforts via echo + claude, unknown client.
 
-- [ ] **Step 20 — Desktop conventions: native menus, layout, Settings
-  dialog.** Follow standard desktop-app conventions.
-  - Native application menu via wails v2 options.Menu: File (New
-    conversation…, Import bundle…, Export transcript…, Export
-    bundle…, Quit), Edit (standard roles so copy/paste work), View
-    (toggle artifact panel, reload), Help (About). Menu items emit
-    Wails events the frontend already handles; remove the equivalent
-    always-visible buttons from the sidebar/header to reclaim space.
-  - Conversation pane real estate: artifact panel becomes an overlay
-    (not a layout column), header actions collapse into the menu /
-    an overflow control, composer stays compact.
-  - Chat transcript design pass: clearer prompt/response bubbles
-    (user prompt right-aligned bubble, agent output full-width card
-    keyed by the agent spine color), consistent spacing/typography.
-  - Settings dialog (in-page modal styled like a native dialog; wails
-    has no cross-platform native prefs window): shows data dir, config
-    path, adapter availability; edits nothing in v1 — a read-only
-    surface the theme/config work can grow into.
-  - Frontend remains no-build vanilla JS; verify on a real machine via
-    make app-dev.
+- [x] **Step 20 — Desktop conventions: native menus, layout, Settings
+  dialog.** Native menu bar via wails options.Menu (built in
+  app.go:applicationMenu): File → New Conversation (Ctrl+N), Import
+  Bundle (Ctrl+O), Export Transcript (Ctrl+S), Export Bundle
+  (Ctrl+Shift+S), Settings (Ctrl+,), Quit (Ctrl+Q); Edit role menu on
+  macOS only (Linux/Windows webviews handle the shortcuts natively);
+  View → Toggle Artifacts (Ctrl+L), Reload UI (F5); Help → About.
+  Items emit the Wails event "menu" with an action string dispatched
+  by the frontend onto the existing handlers; the equivalent
+  always-visible buttons (sidebar Import; header Artifacts / Save
+  transcript / Save bundle) are gone — the header keeps only the
+  contextual Make project…/Move…. The artifact panel is now an overlay
+  drawer over the transcript (top-right card), no longer a layout
+  column stealing conversation height. Transcript design pass: the
+  user's prompt renders as a right-aligned chat bubble (capped width,
+  asymmetric radius, panel-2), agent output stays a full-width column
+  under the agent-colored spine. Settings is an in-page <dialog>
+  (showModal + ::backdrop; wails has no cross-platform native prefs
+  window) showing the theme picker (moved from the Step 21 sidebar
+  footer), data/config/themes paths via the new Info() binding, and
+  client availability — read-only otherwise. Help → About is a small
+  <dialog>. Frontend stays no-build vanilla JS; click-through on a
+  real machine via make app-dev.
 
 - [x] **Step 21 — Themes: light/dark from user-editable theme files.**
   `internal/theme` (stdlib + embed): a theme is a JSON file mapping the
