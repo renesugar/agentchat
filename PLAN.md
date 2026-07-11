@@ -430,6 +430,82 @@ in a compiling state**.
   desktop: Escape didn't close the Settings <dialog> while the theme
   select had focus.
 
+- [ ] **Step 24 — GUI popup verification under a real WM (openbox +
+  xcompmgr are now installed).** Finish the visual checks Step 23
+  could not do: GTK popup surfaces rendered solid black under bare
+  Xvfb because there was no window manager or compositor.
+  - Harness (extends the Step 23 recipe): start `Xvfb :99 -screen 0
+    1400x900x24 &`, then `DISPLAY=:99 openbox &` and `DISPLAY=:99
+    xcompmgr &` BEFORE launching the app; everything else (xdotool,
+    xwd → ffmpeg → PNG, xclip, ≥3s waits) unchanged.
+  - Verify: (a) select dropdown OPTION lists are legible in BOTH
+    themes (agentchat-dark and agentchat-light) — this was the user's
+    original complaint; (b) per-client effort dropdown contents change
+    when switching client (aider: low/medium/high; claude adds
+    xhigh/max; codex starts at minimal; swival has none…default);
+    (c) File/View/Help menu CONTENTS and accelerator labels;
+    (d) the Escape-in-Settings quirk (Escape while the theme select
+    has focus did not close the <dialog> — decide whether it's webkit
+    popup-consumes-Escape behavior or a bug worth a keydown handler).
+  - Fix anything found; screenshot evidence per finding.
+
+## Notes for the next implementing agent (handoff, 2026-07-11)
+
+State: steps 1-17 and 19-21, 23 are done and committed on main; `make
+check` is green and the tree is clean. Remaining: **18** (client-config
+isolation audit), **22** (per-client API-key env), **24** (above).
+Everything below is hard-won context — trust it before re-deriving.
+
+- **Workflow rules** (AGENTS.md still applies): one step per session,
+  commit per step (`step N: summary` + the Co-Authored-By trailer the
+  git log shows), update this file's checkbox in the same commit, and
+  `make check` green before stopping. The user wants: a ZIP after each
+  step (`make zip` → ../agentchat.zip) and to be ASKED before starting
+  the next step. Usage limits interrupt sessions — never leave the
+  tree broken.
+- **Builds**: root module is stdlib-only; the Wails app is the nested
+  module in app/ (wails pinned v2.13.0 to match the installed CLI —
+  keep them in sync). `make app-build-check` compiles+vets it with the
+  right tags; `make app-dev` runs it. The Makefile autodetects the
+  webkit2_41 tag (this machine has only webkit2gtk-4.1); `wails
+  doctor`'s complaint about webkit2gtk-4.0 is expected noise.
+- **GUI harness**: full recipe in Step 23/24. Gotchas: use `pkill -x
+  agentchat-gui` (`-f` matches your own shell and kills it); wait ≥3s
+  after every interaction before screenshotting or you will chase
+  phantom rendering bugs; bare-Xvfb popups render black without
+  openbox+xcompmgr.
+- **Test data**: the e2e data used so far lives in the previous
+  session's scratchpad (path contains a session id — it may be gone).
+  Recreate cheaply: `go run ./cmd/agentchat-cli -client echo -scratch
+  -data <dir> "prompt"` for free turns; a claude haiku turn is cheap
+  and exercises real streaming, but ask before spending the user's
+  quota on many live turns.
+- **Client configs are untouchable**: AgentChat must never write
+  ~/.codex/*, ~/.claude*, .aider.conf.yml, etc. — per-invocation
+  flags/env only. This is documented in docs/adapters.md (codex
+  section) and is the whole point of Step 18. The user has been
+  explicit and burned once; do not regress it.
+- **Facts verified against installed clients** (don't re-litigate,
+  versions in docs/adapters.md): claude 2.1.206 (`--effort
+  low…max`, `--mcp-config` inline JSON works live), codex-cli 0.142.5
+  (`model_reasoning_effort` config key; current models are the
+  gpt-5.6-sol/-terra/-luna, gpt-5.5, gpt-5.4[-mini] lineup — old
+  gpt-5-codex/gpt-5 IDs ERROR), aider 0.86.2, swival 1.0.25. The
+  user's codex uses the openai provider + subscription; no API-key env
+  vars are set for it (relevant to Step 22's design: absent
+  api_key_env must mean "subscription auth", injecting nothing).
+- **Step 18 pointers**: grep write call sites (os.WriteFile/Create/
+  Rename/MkdirAll) — allowed roots are the data dir, managed
+  workspaces, os.TempDir, and user-chosen dialog/export/promote
+  targets; extend the stub-binary RunTurn tests to run with HOME set
+  to a temp dir and assert no config files appear.
+- **Step 22 pointers**: config gets `clients.<name>.api_key_env` (and
+  for aider/swival an `api_key_var` destination override); mapping is
+  applied in Config.Apply AFTER provider/client env so it wins; key
+  VALUES never touch config.json/argv/transcripts — only the variable
+  NAME is configured. claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY
+  destinations.
+
 ## Definition of done for any step
 
 1. `make check` passes (fmt, vet, test).
