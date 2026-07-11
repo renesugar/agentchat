@@ -30,6 +30,9 @@
 }
 
 * { box-sizing: border-box; }
+/* The hidden attribute must always win: several containers set their own
+   display (grid/flex), which otherwise outranks the UA's [hidden] rule. */
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -198,7 +201,6 @@ button:disabled { opacity: 0.45; cursor: default; }
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
-#move-form[hidden] { display: none; }
 #move-form select {
   flex: 1;
   background: var(--ink);

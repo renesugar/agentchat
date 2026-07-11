@@ -396,6 +396,46 @@ in a compiling state**.
     entirely when unset; precedence over provider env; example recipe
     in config.example.json (documented with a secret-tool pattern).
 
+- [ ] **Step 23 — Headless GUI testing with Xvfb + xdotool (continue).**
+  The harness works and already caught a real bug; continue the
+  click-through of Steps 13-21 GUI features and fix what it finds.
+  - Recipe (verified 2026-07-10): build the real binary
+    `cd app && go build -tags desktop,production,webkit2_41 -o
+    <scratch>/agentchat-gui .`; run `Xvfb :99 -screen 0 1400x900x24 &`;
+    launch with `DISPLAY=:99 AGENTCHAT_DATA=<scratch>/e2e-data
+    agentchat-gui &`; drive with `DISPLAY=:99 xdotool
+    mousemove X Y click 1` / `key ctrl+comma` etc.; capture with
+    `xwd -root -silent | ffmpeg -i - shot.png` (xwd + ffmpeg are
+    installed; PIL also available) and view the PNG.
+  - Verified so far: native File/View/Help menu bar renders; sidebar
+    project group + loose conversation + adapter footer correct; a
+    conversation with plain text/thinking events renders perfectly
+    (agent spine, "claude haiku effort low" header, right-aligned
+    prompt bubble, thinking block, snapshot/usage footer).
+  - Fixed already (found by this harness): CSS display rules
+    (grid/flex) beat the UA's [hidden] rule, so the new-conversation
+    form, header actions, and composer leaked onto the empty state —
+    global `[hidden] { display: none !important; }` now wins; also
+    added window error/unhandledrejection → toast so silent UI
+    failures surface (no devtools in the packaged webview).
+  - OPEN BUG to chase next: the "promoted-proj" conversation
+    (20260710T194650-ab10fcd3 in the scratchpad e2e-data; its turn has
+    tool_use/tool_result/file_change/MCP events) opens with an EMPTY
+    transcript — header/composer render, no error toast, while the
+    plain-text conversation renders fine; store reads are fine via CLI
+    -export-turn. On the latest run the click didn't open the
+    conversation at all (intermittent — possibly a click/timing
+    artifact of the harness rather than the app). Next: reproduce with
+    debug toasts after Turns()/Events() (was instrumented once but the
+    run hit the click no-op), or run `wails dev` under Xvfb and use
+    the devserver/inspector for a JS console; suspect either a wails
+    bridge serialization issue on large Event.Raw payloads or a
+    renderEvent edge case for tool events.
+  - Also verify while there: Settings dialog (Ctrl+comma) + theme
+    switch to agentchat-light (select/option legibility), artifact
+    overlay (Ctrl+L), File menu accelerators, per-client effort
+    dropdown contents, per-turn copy button.
+
 ## Definition of done for any step
 
 1. `make check` passes (fmt, vet, test).

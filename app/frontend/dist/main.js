@@ -26,6 +26,12 @@ function el(tag, className, text) {
   return node;
 }
 
+// Surface otherwise-silent failures: without a devtools console in the
+// packaged webview, an uncaught exception or rejected promise would just
+// leave the UI half-rendered.
+window.addEventListener("error", (e) => toast(`ui error: ${e.message}`));
+window.addEventListener("unhandledrejection", (e) => toast(`ui error: ${e.reason}`));
+
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
