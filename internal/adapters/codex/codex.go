@@ -67,6 +67,13 @@ func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 	}, nil
 }
 
+// Efforts implements adapter.EffortLister. Documented
+// model_reasoning_effort levels; codex validates the value at the model,
+// not at config parse (verified on 0.142.5).
+func (a *Adapter) Efforts() []string {
+	return []string{"minimal", "low", "medium", "high", "xhigh"}
+}
+
 // buildArgs constructs the CLI arguments for a turn. The trailing "-" makes
 // codex read the prompt from stdin, avoiding quoting/dash-prefix pitfalls.
 // Kept separate from RunTurn for unit testing.

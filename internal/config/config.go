@@ -68,6 +68,12 @@ type Client struct {
 	// they replace the adapter's built-in list entirely.
 	Models        []adapter.Model `json:"models,omitempty"`
 	ReplaceModels bool            `json:"replace_models,omitempty"`
+	// Efforts are added to the client's effort picker (deduplicated);
+	// with ReplaceEfforts they replace the adapter's built-in levels
+	// entirely. Values pass through to the client, which owns
+	// validation.
+	Efforts        []string `json:"efforts,omitempty"`
+	ReplaceEfforts bool     `json:"replace_efforts,omitempty"`
 }
 
 // Config is the root of config.json.
@@ -168,6 +174,34 @@ func (c *Config) Models(client string, builtin []adapter.Model) []adapter.Model 
 		}
 		index[m.ID] = len(out)
 		out = append(out, m)
+	}
+	return out
+}
+
+// Efforts merges the adapter's built-in effort levels with configured
+// entries. ReplaceEfforts drops the built-ins; otherwise configured
+// levels are appended (deduplicated, order preserved).
+func (c *Config) Efforts(client string, builtin []string) []string {
+	cl, ok := c.Clients[client]
+	if !ok || len(cl.Efforts) == 0 {
+		return builtin
+	}
+	if cl.ReplaceEfforts {
+		return cl.Efforts
+	}
+	out := make([]string, 0, len(builtin)+len(cl.Efforts))
+	seen := make(map[string]bool)
+	for _, e := range builtin {
+		if !seen[e] {
+			seen[e] = true
+			out = append(out, e)
+		}
+	}
+	for _, e := range cl.Efforts {
+		if !seen[e] {
+			seen[e] = true
+			out = append(out, e)
+		}
 	}
 	return out
 }

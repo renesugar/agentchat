@@ -32,6 +32,12 @@ func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 	return []adapter.Model{{ID: "echo-1", Label: "Echo (fake)"}}, nil
 }
 
+// Efforts implements adapter.EffortLister, so engine/UI tests can assert
+// effort plumbing end to end without a real client.
+func (a *Adapter) Efforts() []string {
+	return []string{"low", "medium", "high"}
+}
+
 // RunTurn implements adapter.Adapter.
 func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit adapter.EmitFunc) (*adapter.Result, error) {
 	start := time.Now()

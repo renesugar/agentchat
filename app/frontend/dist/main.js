@@ -101,6 +101,17 @@ function refreshModels() {
     opt.value = m.id;
     modelSel.append(opt);
   }
+
+  // Effort levels are per client (adapter capability merged with the
+  // user's config); keep the current pick when the new client offers it.
+  const effortSel = $("effort");
+  const prev = effortSel.value;
+  effortSel.replaceChildren();
+  effortSel.append(new Option("Effort: client default", ""));
+  for (const e of info?.efforts || []) {
+    effortSel.append(new Option(e, e));
+  }
+  if (prev && (info?.efforts || []).includes(prev)) effortSel.value = prev;
 }
 
 /* ---------- conversation list ---------- */

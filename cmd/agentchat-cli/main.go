@@ -387,7 +387,12 @@ func listAdapters(ctx context.Context, set *clients.Set) error {
 		for i, m := range models {
 			ids[i] = m.ID
 		}
-		fmt.Printf("%s\t%s\tmodels: %s\n", name, status, strings.Join(ids, ", "))
+		efforts, err := set.Efforts(ctx, name)
+		if err != nil {
+			return fmt.Errorf("%s: listing efforts: %w", name, err)
+		}
+		fmt.Printf("%s\t%s\tmodels: %s\tefforts: %s\n",
+			name, status, strings.Join(ids, ", "), strings.Join(efforts, ", "))
 	}
 	return nil
 }

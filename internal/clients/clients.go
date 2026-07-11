@@ -70,6 +70,22 @@ func (s *Set) Models(ctx context.Context, client string) ([]adapter.Model, error
 	return s.Config.Models(client, builtin), nil
 }
 
+// Efforts returns a client's effort picker entries: the adapter's
+// advertised levels (nil when the adapter has no effort control) merged
+// with configured additions (see config.Config.Efforts). "" (client
+// default) is implied and never part of the list.
+func (s *Set) Efforts(ctx context.Context, client string) ([]string, error) {
+	a, err := s.Registry.Get(client)
+	if err != nil {
+		return nil, err
+	}
+	var builtin []string
+	if el, ok := a.(adapter.EffortLister); ok {
+		builtin = el.Efforts()
+	}
+	return s.Config.Efforts(client, builtin), nil
+}
+
 // Prepare applies the client's configured defaults (provider env, extra
 // values) to a turn request. Call before Engine.RunTurn.
 func (s *Set) Prepare(client string, req *adapter.TurnRequest) {

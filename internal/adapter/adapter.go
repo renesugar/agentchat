@@ -88,6 +88,14 @@ type Adapter interface {
 	RunTurn(ctx context.Context, req TurnRequest, emit EmitFunc) (*Result, error)
 }
 
+// EffortLister is an optional adapter capability: clients with a
+// reasoning-effort control advertise the levels their installed version
+// accepts, for effort pickers. Adapters without it get no effort options
+// beyond the client default (TurnRequest.Effort still passes through).
+type EffortLister interface {
+	Efforts() []string
+}
+
 // ErrUnknownAdapter is returned by Registry.Get for unregistered names.
 var ErrUnknownAdapter = errors.New("unknown adapter")
 

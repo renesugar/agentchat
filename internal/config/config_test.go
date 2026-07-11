@@ -36,9 +36,14 @@ const sample = `{
     "swival": {
       "extra": { "provider": "generic", "base_url": "http://localhost:8080/v1" },
       "models": [ { "id": "qwen3-coder", "label": "Qwen3 Coder" } ],
-      "replace_models": true
+      "replace_models": true,
+      "efforts": [ "low", "high" ],
+      "replace_efforts": true
     },
-    "claude": { "binary": "/opt/bin/claude-custom" }
+    "claude": {
+      "binary": "/opt/bin/claude-custom",
+      "efforts": [ "high", "ultrathink" ]
+    }
   }
 }`
 
@@ -156,6 +161,47 @@ func TestModelsMerging(t *testing.T) {
 	// Unconfigured client: built-ins untouched.
 	if got := c.Models("codex", builtin); !reflect.DeepEqual(got, builtin) {
 		t.Errorf("codex models = %v", got)
+	}
+}
+
+func TestEfforts(t *testing.T) {
+	c, err := config.Load(writeConfig(t, sample))
+	if err != nil {
+		t.Fatal(err)
+	}
+	builtin := []string{"low", "medium", "high"}
+
+	// Configured efforts append with dedupe ("high" already built in).
+	got := c.Efforts("claude", builtin)
+	want := []string{"low", "medium", "high", "ultrathink"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("claude efforts:\n got %v\nwant %v", got, want)
+	}
+
+	// replace_efforts drops built-ins.
+	if got := c.Efforts("swival", builtin); !reflect.DeepEqual(got, []string{"low", "high"}) {
+		t.Errorf("swival efforts = %v", got)
+	}
+
+	// Unconfigured client: built-ins untouched.
+	if got := c.Efforts("codex", builtin); !reflect.DeepEqual(got, builtin) {
+		t.Errorf("codex efforts = %v", got)
+	}
+
+	// Set.Efforts merges the adapter capability with config: echo
+	// advertises low/medium/high and has no config entry.
+	set := clients.New(c)
+	efforts, err := set.Efforts(context.Background(), "echo")
+	if err != nil || !reflect.DeepEqual(efforts, []string{"low", "medium", "high"}) {
+		t.Errorf("echo efforts via Set = %v, %v", efforts, err)
+	}
+	// claude: adapter levels (low..max) + config's ultrathink, deduped.
+	efforts, err = set.Efforts(context.Background(), "claude")
+	if err != nil || !reflect.DeepEqual(efforts, []string{"low", "medium", "high", "xhigh", "max", "ultrathink"}) {
+		t.Errorf("claude efforts via Set = %v, %v", efforts, err)
+	}
+	if _, err := set.Efforts(context.Background(), "nope"); err == nil {
+		t.Error("unknown client accepted")
 	}
 }
 

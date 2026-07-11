@@ -6,6 +6,11 @@ live in `<data>/config.json` — see `docs/config.example.json` and
 OPENAI_API_KEY); swival → `extra: {provider: generic, base_url: ...}`;
 claude/codex → their own env/config conventions.
 
+Model and effort pickers are per client: adapters advertise the levels
+verified against their installed versions (see each section), and
+config.json can append or replace both lists (`clients.<name>.models` /
+`replace_models`, `clients.<name>.efforts` / `replace_efforts`).
+
 Record here the *verified* non-interactive invocation for each client, with
 the client version you verified it against. Planned invocations (unverified)
 are marked ⚠ — verify with `<client> --help` before implementing the adapter

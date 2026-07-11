@@ -305,29 +305,23 @@ in a compiling state**.
     run with HOME pointed at a temp dir and assert no config files
     appear there after a turn.
 
-- [ ] **Step 19 — Configurable model & effort pickers.** Make BOTH
-  dropdowns per-client and user-configurable (models already are via
-  Step 11; efforts are currently one hardcoded list in index.html).
-  - `internal/adapter`: optional capability interface `EffortLister
-    { Efforts() []string }` (no change to the core Adapter interface).
-    Adapters advertise the levels verified against their installed
-    clients (docs/adapters.md): claude low/medium/high/xhigh/max;
-    codex minimal/low/medium/high/xhigh; aider low/medium/high
-    (free-form pass-through; these are the common values litellm
-    forwards); swival none/minimal/low/medium/high/xhigh/default;
-    echo low/medium/high (for plumbing tests).
-  - Config: `clients.<name>.efforts` (+ `replace_efforts`) mirroring
-    the models mechanism — append-with-dedupe by default, replace when
-    asked; `Config.Efforts(client, builtin)`; `Set.Efforts(ctx,
-    client)` merges adapter capability + config.
-  - App: `AdapterInfo` gains `Efforts []string`; GUI populates the
-    effort select per selected client (option "" = client default) and
-    repopulates on client change, exactly like the model select.
-  - CLI: `-list` prints each client's efforts.
-  - Docs: config.example.json gains an efforts recipe; adapters.md
-    notes the per-client lists.
-  - Tests: config efforts merge/replace/dedupe precedence; per-adapter
-    Efforts contents; Set.Efforts via echo.
+- [x] **Step 19 — Configurable model & effort pickers.** Both dropdowns
+  are per-client and user-configurable. `adapter.EffortLister`
+  (optional capability; core Adapter interface unchanged) lets
+  adapters advertise the levels verified against their installed
+  clients: claude low/medium/high/xhigh/max, codex
+  minimal/low/medium/high/xhigh, aider low/medium/high (free-form
+  pass-through), swival none/minimal/low/medium/high/xhigh/default,
+  echo low/medium/high (plumbing tests). Config:
+  `clients.<name>.efforts` + `replace_efforts` mirror the models
+  mechanism (append-with-dedupe, or replace); `Config.Efforts` +
+  `Set.Efforts` merge capability + config. App: AdapterInfo gains
+  Efforts; the GUI effort select is populated per selected client
+  (option "" = client default, previous pick kept when still offered)
+  and repopulates on client change like the model select — the
+  hardcoded list in index.html is gone. CLI `-list` prints efforts.
+  Recipes in config.example.json; note in adapters.md. Tests: config
+  merge/replace/dedupe, Set.Efforts via echo + claude, unknown client.
 
 - [ ] **Step 20 — Desktop conventions: native menus, layout, Settings
   dialog.** Follow standard desktop-app conventions.

@@ -61,6 +61,13 @@ func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 	}, nil
 }
 
+// Efforts implements adapter.EffortLister. --reasoning-effort is a
+// free-form pass-through (litellm forwards it to models that support
+// it); these are the common OpenAI-compatible values.
+func (a *Adapter) Efforts() []string {
+	return []string{"low", "medium", "high"}
+}
+
 // buildArgs constructs the CLI arguments for a turn. Kept separate from
 // RunTurn for unit testing.
 //

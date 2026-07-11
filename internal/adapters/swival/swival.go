@@ -67,6 +67,12 @@ func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 	}, nil
 }
 
+// Efforts implements adapter.EffortLister. Levels per swival 1.0.25
+// --help (--reasoning-effort LEVEL).
+func (a *Adapter) Efforts() []string {
+	return []string{"none", "minimal", "low", "medium", "high", "xhigh", "default"}
+}
+
 // buildArgs constructs the CLI arguments for a turn; the task itself is
 // piped to stdin (documented behavior when no positional task is given and
 // stdin is not a TTY). Kept separate from RunTurn for unit testing.

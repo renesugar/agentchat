@@ -110,12 +110,16 @@ func (a *App) shutdown(ctx context.Context) {
 
 // --- adapters ---
 
-// AdapterInfo is what the model picker renders.
+// AdapterInfo is what the model/effort pickers render.
 type AdapterInfo struct {
 	Name      string          `json:"name"`
 	Available bool            `json:"available"`
 	Detail    string          `json:"detail,omitempty"` // why unavailable
 	Models    []adapter.Model `json:"models"`
+	// Efforts are the client's selectable reasoning-effort levels
+	// (adapter capability merged with config); empty when the client
+	// has none. "" (client default) is implied.
+	Efforts []string `json:"efforts,omitempty"`
 }
 
 // Adapters lists registered coding clients with availability and models.
@@ -133,6 +137,9 @@ func (a *App) Adapters() ([]AdapterInfo, error) {
 		}
 		if models, err := a.set.Models(a.ctx, name); err == nil {
 			info.Models = models
+		}
+		if efforts, err := a.set.Efforts(a.ctx, name); err == nil {
+			info.Efforts = efforts
 		}
 		out = append(out, info)
 	}

@@ -62,6 +62,12 @@ func (a *Adapter) Models(ctx context.Context) ([]adapter.Model, error) {
 	}, nil
 }
 
+// Efforts implements adapter.EffortLister. Levels per claude 2.1.206
+// --help (--effort <level>).
+func (a *Adapter) Efforts() []string {
+	return []string{"low", "medium", "high", "xhigh", "max"}
+}
+
 // buildArgs constructs the CLI arguments for a turn. Kept separate from
 // RunTurn so it can be unit-tested without spawning anything.
 func buildArgs(req adapter.TurnRequest) []string {

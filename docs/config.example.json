@@ -37,7 +37,9 @@
       "default_effort": "high",
       "models": [
         { "id": "claude-sonnet-4-6", "label": "Sonnet 4.6 (pinned)" }
-      ]
+      ],
+      "efforts": [ "medium", "high", "max" ],
+      "replace_efforts": true
     },
     "codex": {
       "extra": { "sandbox": "workspace-write" }
