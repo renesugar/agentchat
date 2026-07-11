@@ -305,6 +305,97 @@ in a compiling state**.
     run with HOME pointed at a temp dir and assert no config files
     appear there after a turn.
 
+- [ ] **Step 19 — Configurable model & effort pickers.** Make BOTH
+  dropdowns per-client and user-configurable (models already are via
+  Step 11; efforts are currently one hardcoded list in index.html).
+  - `internal/adapter`: optional capability interface `EffortLister
+    { Efforts() []string }` (no change to the core Adapter interface).
+    Adapters advertise the levels verified against their installed
+    clients (docs/adapters.md): claude low/medium/high/xhigh/max;
+    codex minimal/low/medium/high/xhigh; aider low/medium/high
+    (free-form pass-through; these are the common values litellm
+    forwards); swival none/minimal/low/medium/high/xhigh/default;
+    echo low/medium/high (for plumbing tests).
+  - Config: `clients.<name>.efforts` (+ `replace_efforts`) mirroring
+    the models mechanism — append-with-dedupe by default, replace when
+    asked; `Config.Efforts(client, builtin)`; `Set.Efforts(ctx,
+    client)` merges adapter capability + config.
+  - App: `AdapterInfo` gains `Efforts []string`; GUI populates the
+    effort select per selected client (option "" = client default) and
+    repopulates on client change, exactly like the model select.
+  - CLI: `-list` prints each client's efforts.
+  - Docs: config.example.json gains an efforts recipe; adapters.md
+    notes the per-client lists.
+  - Tests: config efforts merge/replace/dedupe precedence; per-adapter
+    Efforts contents; Set.Efforts via echo.
+
+- [ ] **Step 20 — Desktop conventions: native menus, layout, Settings
+  dialog.** Follow standard desktop-app conventions.
+  - Native application menu via wails v2 options.Menu: File (New
+    conversation…, Import bundle…, Export transcript…, Export
+    bundle…, Quit), Edit (standard roles so copy/paste work), View
+    (toggle artifact panel, reload), Help (About). Menu items emit
+    Wails events the frontend already handles; remove the equivalent
+    always-visible buttons from the sidebar/header to reclaim space.
+  - Conversation pane real estate: artifact panel becomes an overlay
+    (not a layout column), header actions collapse into the menu /
+    an overflow control, composer stays compact.
+  - Chat transcript design pass: clearer prompt/response bubbles
+    (user prompt right-aligned bubble, agent output full-width card
+    keyed by the agent spine color), consistent spacing/typography.
+  - Settings dialog (in-page modal styled like a native dialog; wails
+    has no cross-platform native prefs window): shows data dir, config
+    path, adapter availability; edits nothing in v1 — a read-only
+    surface the theme/config work can grow into.
+  - Frontend remains no-build vanilla JS; verify on a real machine via
+    make app-dev.
+
+- [ ] **Step 21 — Themes: light/dark from user-editable theme files.**
+  - Theme = JSON file mapping the CSS custom properties the frontend
+    already uses (--ink, --panel, --text, --muted, --line, agent
+    colors, …). Ship built-in "agentchat-dark" and "agentchat-light"
+    themes embedded in the app; user themes live in <data>/themes/
+    *.json and override/extend the built-ins by name.
+  - App bindings: `Themes()` (built-in + user), `Theme(name)` (resolved
+    variable map), selection persisted in ui-state.json; frontend
+    applies variables to :root at startup and on change; a
+    View→Theme menu (Step 20) or Settings control switches them.
+  - Fix the dropdown legibility bug while at it: <option> elements
+    render with the platform default (white) background but inherited
+    light text — set explicit color/background on select/option for
+    both themes.
+  - Tests: theme file parsing/validation (unknown keys tolerated,
+    non-color values rejected), built-in themes complete (every CSS
+    variable the frontend uses is defined — assert against a list),
+    user override precedence.
+
+- [ ] **Step 22 — Per-client API-key environment configuration.**
+  Let users choose, per client, WHICH environment variable holds the
+  API key — and whether one is used at all (subscription vs. API
+  billing; cf. free-claude-code-style setups that redirect clients via
+  env).
+  - Config: `clients.<name>.api_key_env` — the NAME of a variable in
+    AgentChat's process environment whose value is forwarded to the
+    client as its canonical key variable (claude → ANTHROPIC_API_KEY,
+    codex → OPENAI_API_KEY, aider/swival → provider-dependent, so for
+    them api_key_env pairs with `api_key_var` naming the destination;
+    default destination per adapter). Empty/absent = no key injected:
+    claude/codex fall back to their own subscription login, exactly as
+    today.
+  - The key VALUE never lands in config.json (only the variable name),
+    never in argv, and never in the transcript store — same rule as
+    the MCP token. Works with keyring-sourced vars (secret-tool → env).
+  - Interaction with providers/env (Step 11): api_key_env is applied
+    by Config.Apply after provider/client env so it wins; document
+    precedence.
+  - AGENTS/ARCHITECTURE note: this must respect the Step 18 guarantee —
+    env only, never client config files.
+  - CLI/GUI: no new surface needed (config.json only) beyond showing
+    "key: from $VAR / subscription" in the adapter footer/Settings.
+  - Tests: Apply injects the mapped variable when set and omits it
+    entirely when unset; precedence over provider env; example recipe
+    in config.example.json (documented with a secret-tool pattern).
+
 ## Definition of done for any step
 
 1. `make check` passes (fmt, vet, test).
