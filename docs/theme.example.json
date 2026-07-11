@@ -1,0 +1,20 @@
+{
+  "_comment": "Example user theme. Copy into <data>/themes/<name>.json (data dir: $AGENTCHAT_DATA or ~/.agentchat). 'base' picks the built-in to extend (agentchat-dark or agentchat-light); 'vars' overrides its colors. A file named after a built-in (e.g. agentchat-dark.json) overrides that theme in place. Values must be CSS colors: hex, rgb[a](), hsl[a](), or a color name.",
+  "name": "sepia",
+  "base": "agentchat-light",
+  "vars": {
+    "ink": "#f3ead9",
+    "panel": "#faf4e8",
+    "panel-2": "#ece2cd",
+    "line": "#d8cbb0",
+    "text": "#3d3122",
+    "muted": "#7d6f58",
+    "focus": "#a06b2a",
+    "danger": "#a63d2f",
+    "agent-claude": "#7a4a1e",
+    "agent-codex": "#4e6b3a",
+    "agent-aider": "#8a6a1a",
+    "agent-swival": "#6d4a86",
+    "agent-echo": "#6e6353"
+  }
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/export"
 	"github.com/example/agentchat/internal/mcpserver"
+	"github.com/example/agentchat/internal/theme"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -162,6 +163,27 @@ func (a *App) Projects() ([]transcript.Project, error) {
 		return nil, err
 	}
 	return transcript.Projects(convs), nil
+}
+
+// Themes lists the available UI themes: built-ins plus user JSON files
+// in <data>/themes (a user file with a built-in's name overrides it).
+// Loaded fresh on every call so edits show up without a restart.
+func (a *App) Themes() ([]theme.Info, error) {
+	set, err := theme.Load(filepath.Join(a.store.Root(), "themes"))
+	if err != nil {
+		return nil, err
+	}
+	return set.List(), nil
+}
+
+// Theme resolves a theme to its CSS variable map (names without the
+// leading "--"); the frontend applies them to :root.
+func (a *App) Theme(name string) (map[string]string, error) {
+	set, err := theme.Load(filepath.Join(a.store.Root(), "themes"))
+	if err != nil {
+		return nil, err
+	}
+	return set.Resolve(name)
 }
 
 // UIState returns the persisted frontend state JSON ("{}" when none was

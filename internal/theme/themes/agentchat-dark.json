@@ -1,0 +1,18 @@
+{
+  "name": "agentchat-dark",
+  "vars": {
+    "ink": "#101418",
+    "panel": "#171d24",
+    "panel-2": "#1d242d",
+    "line": "#242e39",
+    "text": "#d7dee7",
+    "muted": "#7b8794",
+    "focus": "#9db8d9",
+    "danger": "#e08a8a",
+    "agent-claude": "#8fb4ff",
+    "agent-codex": "#7bd3b4",
+    "agent-aider": "#e0b65c",
+    "agent-swival": "#c79bf2",
+    "agent-echo": "#8a94a0"
+  }
+}

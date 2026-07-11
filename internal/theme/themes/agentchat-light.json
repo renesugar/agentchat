@@ -1,0 +1,18 @@
+{
+  "name": "agentchat-light",
+  "vars": {
+    "ink": "#f6f6f3",
+    "panel": "#ffffff",
+    "panel-2": "#eceff3",
+    "line": "#d8dee6",
+    "text": "#22303e",
+    "muted": "#66727f",
+    "focus": "#3b82c4",
+    "danger": "#b3403f",
+    "agent-claude": "#2d64c8",
+    "agent-codex": "#177a5c",
+    "agent-aider": "#9a6510",
+    "agent-swival": "#7440ba",
+    "agent-echo": "#5d6a77"
+  }
+}

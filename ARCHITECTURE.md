@@ -117,6 +117,7 @@ internal/engine/       runs a turn via an adapter and persists it to the store
 internal/workspace/    Step 7: repo/worktree/scratch + per-turn snapshots
 internal/artifact/     Step 8: artifact library
 internal/mcpserver/    Step 12: loopback MCP callback server (progress/artifacts)
+internal/theme/        Step 21: UI color themes (built-in + user JSON files)
 app/                   Wails desktop app — NESTED module (own go.mod with a
                        replace to the core) so the root stays dependency-free;
                        vanilla JS frontend embedded from app/frontend/dist

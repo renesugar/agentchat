@@ -56,7 +56,13 @@ Go 1.26.
 - `MoveConversation(conv, path)` — re-associate with a project repo
   ("" detaches); future turns run there, history stays untouched
 - `UIState()` / `SetUIState(json)` — persisted frontend state
-  (`<data>/ui-state.json`; e.g. which project groups are collapsed)
+  (`<data>/ui-state.json`; collapsed project groups, selected theme)
+- `Themes()` / `Theme(name)` — UI themes as CSS-variable maps. Built-in:
+  agentchat-dark, agentchat-light. User themes are JSON files in
+  `<data>/themes/` (same name = override a built-in; new name + "base"
+  = extend one); format in docs/theme.example.json. Values are
+  validated as CSS colors; loaded fresh per call so edits apply on the
+  next theme switch without restarting.
 - `ImportBundle()` — open-dialog restore of an exported bundle; refuses
   ID collisions, associates a restored workspace for this session
 - `Artifacts(conv)` — the conversation's artifact records

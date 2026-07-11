@@ -344,24 +344,27 @@ in a compiling state**.
   - Frontend remains no-build vanilla JS; verify on a real machine via
     make app-dev.
 
-- [ ] **Step 21 — Themes: light/dark from user-editable theme files.**
-  - Theme = JSON file mapping the CSS custom properties the frontend
-    already uses (--ink, --panel, --text, --muted, --line, agent
-    colors, …). Ship built-in "agentchat-dark" and "agentchat-light"
-    themes embedded in the app; user themes live in <data>/themes/
-    *.json and override/extend the built-ins by name.
-  - App bindings: `Themes()` (built-in + user), `Theme(name)` (resolved
-    variable map), selection persisted in ui-state.json; frontend
-    applies variables to :root at startup and on change; a
-    View→Theme menu (Step 20) or Settings control switches them.
-  - Fix the dropdown legibility bug while at it: <option> elements
-    render with the platform default (white) background but inherited
-    light text — set explicit color/background on select/option for
-    both themes.
-  - Tests: theme file parsing/validation (unknown keys tolerated,
-    non-color values rejected), built-in themes complete (every CSS
-    variable the frontend uses is defined — assert against a list),
-    user override precedence.
+- [x] **Step 21 — Themes: light/dark from user-editable theme files.**
+  `internal/theme` (stdlib + embed): a theme is a JSON file mapping the
+  frontend's CSS custom properties (theme.RequiredVars: ink, panel,
+  panel-2, line, text, muted, focus, danger, agent-*; fonts are not
+  themeable). Built-ins agentchat-dark and agentchat-light are
+  embedded; user files in <data>/themes/*.json override a built-in by
+  name or add new themes extending one via "base" (default: the
+  same-named built-in, else agentchat-dark — user themes are always
+  complete). Values validated as CSS colors (hex/rgb[a]/hsl[a]/name;
+  anything else — including CSS injection — is a loud per-file error);
+  unknown JSON keys tolerated. App bindings Themes()/Theme(name)
+  (loaded fresh per call so edits apply without restart); selection
+  persisted in ui-state.json; the frontend applies variables to :root
+  at startup/switch via a theme select in the sidebar footer (moves
+  into the Step 20 View menu/Settings later). The hardcoded #e08a8a
+  became --danger, and select/option now set explicit
+  background/color — the dropdown-illegibility fix. Example user theme
+  in docs/theme.example.json. Tests: built-ins complete vs.
+  RequiredVars and actually differ, override/extend/base precedence,
+  validation table (non-colors, injection, bad names, malformed JSON),
+  List order/sources.
 
 - [ ] **Step 22 — Per-client API-key environment configuration.**
   Let users choose, per client, WHICH environment variable holds the

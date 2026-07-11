@@ -14,6 +14,7 @@ const state = {
   running: false,
   liveTurnEl: null,   // element receiving streamed events
   collapsed: {},      // project path -> true (persisted via UIState)
+  theme: "",          // selected theme name (persisted via UIState)
 };
 
 /* ---------- helpers ---------- */
@@ -188,8 +189,48 @@ function toggleProject(path) {
 }
 
 function saveUIState() {
-  api().SetUIState(JSON.stringify({ collapsedProjects: state.collapsed }))
+  api().SetUIState(JSON.stringify({ collapsedProjects: state.collapsed, theme: state.theme }))
     .catch(() => {}); // cosmetic state; losing it is not worth a toast
+}
+
+/* ---------- themes ---------- */
+
+// applyTheme resolves a theme through the backend and sets its CSS
+// variables on :root. The stylesheet's :root block stays as the
+// pre-JS fallback (agentchat-dark).
+async function applyTheme(name) {
+  try {
+    const vars = await api().Theme(name);
+    for (const [k, v] of Object.entries(vars || {})) {
+      document.documentElement.style.setProperty("--" + k, v);
+    }
+    state.theme = name;
+  } catch (err) {
+    toast(`theme "${name}": ${err}`);
+  }
+}
+
+async function loadThemes() {
+  const sel = $("theme");
+  sel.replaceChildren();
+  try {
+    for (const t of (await api().Themes()) || []) {
+      sel.append(new Option(t.source === "user" ? `${t.name} (user)` : t.name, t.name));
+    }
+  } catch (err) {
+    toast(String(err));
+    return;
+  }
+  if (state.theme && [...sel.options].some((o) => o.value === state.theme)) {
+    sel.value = state.theme;
+  }
+  // Always apply (even the default): a user file may override the
+  // built-in dark theme the stylesheet falls back to.
+  if (sel.value) await applyTheme(sel.value);
+  sel.onchange = async () => {
+    await applyTheme(sel.value);
+    saveUIState();
+  };
 }
 
 // deleteButton is a two-click delete control: the first click arms it
@@ -632,10 +673,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   try {
     const ui = JSON.parse(await api().UIState());
     state.collapsed = ui.collapsedProjects || {};
+    state.theme = ui.theme || "";
   } catch {
     state.collapsed = {};
   }
 
+  await loadThemes();
   await loadAdapters();
   await loadConversations();
 });

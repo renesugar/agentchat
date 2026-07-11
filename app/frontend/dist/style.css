@@ -4,6 +4,11 @@
    carries a colored left rail keyed to the agent that produced it, so a
    multi-agent conversation reads as a ledger of handoffs. */
 
+/* Color variables mirror internal/theme/themes/agentchat-dark.json (the
+   defaults painted before JS applies the selected theme). Themes are
+   JSON files — built-ins plus user files in <data>/themes/ — applied at
+   runtime via style.setProperty; keep this block and RequiredVars in
+   internal/theme in sync. Fonts are not themeable. */
 :root {
   --ink: #101418;
   --panel: #171d24;
@@ -12,6 +17,7 @@
   --text: #d7dee7;
   --muted: #7b8794;
   --focus: #9db8d9;
+  --danger: #e08a8a;
 
   --agent-claude: #8fb4ff;
   --agent-codex: #7bd3b4;
@@ -32,6 +38,11 @@ body {
   font: 14px/1.55 var(--body);
 }
 button, input, select, textarea { font: inherit; color: inherit; }
+/* Explicit select/option colors: the platform popup otherwise renders
+   options with a default (light) background but inherited light text,
+   making them near-invisible in the dark theme (and vice versa). */
+select { background-color: var(--ink); color: var(--text); }
+option { background-color: var(--ink); color: var(--text); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
@@ -144,7 +155,25 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 #conversations .conv:hover .del-conv { visibility: visible; }
 #conversations .conv .del-conv:hover { color: var(--text); border-color: var(--line); }
-#conversations .conv .del-conv.arm { color: #e08a8a; border-color: #e08a8a; visibility: visible; }
+#conversations .conv .del-conv.arm { color: var(--danger); border-color: var(--danger); visibility: visible; }
+
+#theme-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 8px 14px;
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+#theme-row select {
+  flex: 1;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font: 11px var(--mono);
+}
 
 #adapter-status {
   border-top: 1px solid var(--line);
@@ -220,7 +249,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .turn > .who .seq { color: var(--muted); font-weight: 400; margin-right: 8px; }
 .turn > .who .model { color: var(--muted); font-weight: 400; }
 .turn > .who .model + .model { margin-left: 8px; }
-.turn > .who .status-failed { color: #e08a8a; margin-left: 8px; }
+.turn > .who .status-failed { color: var(--danger); margin-left: 8px; }
 .turn > .who .copy-turn {
   visibility: hidden;
   margin-left: 8px;
@@ -258,7 +287,7 @@ button:disabled { opacity: 0.45; cursor: default; }
   overflow-x: auto;
   font: 12px/1.5 var(--mono);
 }
-.ev.error { color: #e08a8a; font: 12.5px var(--mono); }
+.ev.error { color: var(--danger); font: 12.5px var(--mono); }
 .ev.file { font: 12px var(--mono); }
 .ev.file b { color: var(--agent, var(--text)); font-weight: 600; }
 
