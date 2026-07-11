@@ -201,15 +201,25 @@ function saveUIState() {
 
 /* ---------- themes ---------- */
 
-// applyTheme resolves a theme through the backend and sets its CSS
-// variables on :root. The stylesheet's :root block stays as the
-// pre-JS fallback (agentchat-dark).
+// applyTheme resolves a theme through the backend and installs its CSS
+// variables as a real :root stylesheet rule (a <style> element). Inline
+// style.setProperty is NOT enough: the webview's native <select> popup
+// resolves variables through the stylesheet cascade only, so inline
+// overrides left dropdown popups painted with the built-in dark colors.
+// The stylesheet's own :root block stays as the pre-JS fallback.
 async function applyTheme(name) {
   try {
     const vars = await api().Theme(name);
-    for (const [k, v] of Object.entries(vars || {})) {
-      document.documentElement.style.setProperty("--" + k, v);
+    const css = Object.entries(vars || {})
+      .map(([k, v]) => `--${k}: ${v};`)
+      .join(" ");
+    let sheet = document.getElementById("theme-vars");
+    if (!sheet) {
+      sheet = document.createElement("style");
+      sheet.id = "theme-vars";
+      document.head.append(sheet);
     }
+    sheet.textContent = `:root { ${css} }`;
     state.theme = name;
   } catch (err) {
     toast(`theme "${name}": ${err}`);

@@ -396,45 +396,39 @@ in a compiling state**.
     entirely when unset; precedence over provider env; example recipe
     in config.example.json (documented with a secret-tool pattern).
 
-- [ ] **Step 23 — Headless GUI testing with Xvfb + xdotool (continue).**
-  The harness works and already caught a real bug; continue the
-  click-through of Steps 13-21 GUI features and fix what it finds.
-  - Recipe (verified 2026-07-10): build the real binary
-    `cd app && go build -tags desktop,production,webkit2_41 -o
-    <scratch>/agentchat-gui .`; run `Xvfb :99 -screen 0 1400x900x24 &`;
-    launch with `DISPLAY=:99 AGENTCHAT_DATA=<scratch>/e2e-data
-    agentchat-gui &`; drive with `DISPLAY=:99 xdotool
-    mousemove X Y click 1` / `key ctrl+comma` etc.; capture with
-    `xwd -root -silent | ffmpeg -i - shot.png` (xwd + ffmpeg are
-    installed; PIL also available) and view the PNG.
-  - Verified so far: native File/View/Help menu bar renders; sidebar
-    project group + loose conversation + adapter footer correct; a
-    conversation with plain text/thinking events renders perfectly
-    (agent spine, "claude haiku effort low" header, right-aligned
-    prompt bubble, thinking block, snapshot/usage footer).
-  - Fixed already (found by this harness): CSS display rules
-    (grid/flex) beat the UA's [hidden] rule, so the new-conversation
-    form, header actions, and composer leaked onto the empty state —
-    global `[hidden] { display: none !important; }` now wins; also
-    added window error/unhandledrejection → toast so silent UI
-    failures surface (no devtools in the packaged webview).
-  - OPEN BUG to chase next: the "promoted-proj" conversation
-    (20260710T194650-ab10fcd3 in the scratchpad e2e-data; its turn has
-    tool_use/tool_result/file_change/MCP events) opens with an EMPTY
-    transcript — header/composer render, no error toast, while the
-    plain-text conversation renders fine; store reads are fine via CLI
-    -export-turn. On the latest run the click didn't open the
-    conversation at all (intermittent — possibly a click/timing
-    artifact of the harness rather than the app). Next: reproduce with
-    debug toasts after Turns()/Events() (was instrumented once but the
-    run hit the click no-op), or run `wails dev` under Xvfb and use
-    the devserver/inspector for a JS console; suspect either a wails
-    bridge serialization issue on large Event.Raw payloads or a
-    renderEvent edge case for tool events.
-  - Also verify while there: Settings dialog (Ctrl+comma) + theme
-    switch to agentchat-light (select/option legibility), artifact
-    overlay (Ctrl+L), File menu accelerators, per-client effort
-    dropdown contents, per-turn copy button.
+- [x] **Step 23 — Headless GUI testing with Xvfb + xdotool.** Harness
+  recipe (works, reusable): `cd app && go build -tags
+  desktop,production,webkit2_41 -o <scratch>/agentchat-gui .`;
+  `Xvfb :99 -screen 0 1400x900x24 &`; `DISPLAY=:99
+  AGENTCHAT_DATA=<scratch>/e2e-data agentchat-gui &`; drive with
+  `DISPLAY=:99 xdotool mousemove X Y click 1` / `key ctrl+comma`;
+  capture `xwd -root -silent` → ffmpeg → PNG; read clipboard with
+  `xclip -o -selection clipboard`. Wait ≥3s after interactions — the
+  software-rendered webview repaints slowly, and screenshots taken at
+  1-2s produced FALSE "empty transcript" bugs (chased and disproved:
+  tool/MCP-event conversations render perfectly).
+  Verified: menu bar renders + Ctrl+comma/Ctrl+L accelerators fire;
+  empty state clean after the [hidden] fix; full transcript rendering
+  (spine, effort header, prompt bubble, tool/MCP events, footer);
+  Settings dialog (theme picker, paths, clients); light theme applies
+  live AND persists across app restart via ui-state; artifact overlay
+  floats without squeezing the transcript; per-turn copy puts exact
+  TurnMarkdown on the X clipboard (verified byte-for-byte with xclip).
+  Fixed along the way: `[hidden] { display:none !important }` (display
+  rules on containers beat the UA rule, leaking hidden UI onto the
+  empty state); window error/unhandledrejection → toast; applyTheme
+  now injects a real `:root{}` <style> rule instead of inline
+  setProperty so native popup surfaces resolve theme variables through
+  the cascade.
+  Environment limits (NOT app bugs — retest on a real desktop or after
+  installing a WM + compositor, e.g. openbox + xcompmgr): GTK popup
+  surfaces (select dropdown lists, native menus) render as solid black
+  under WM/compositor-less Xvfb (ARGB visuals without compositing), so
+  option-list CONTENTS and File-menu contents could not be visually
+  verified — the option/select CSS colors and per-client effort lists
+  are covered by code + unit tests. Minor quirk to check on a real
+  desktop: Escape didn't close the Settings <dialog> while the theme
+  select had focus.
 
 ## Definition of done for any step
 
