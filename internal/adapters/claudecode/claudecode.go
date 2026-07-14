@@ -84,6 +84,11 @@ func buildArgs(req adapter.TurnRequest) []string {
 		// claude 2.1.206: low, medium, high, xhigh, max.
 		args = append(args, "--effort", req.Effort)
 	}
+	if req.SystemPrompt != "" {
+		// Appends to the default system prompt (verified on 2.1.206);
+		// --system-prompt would REPLACE the preset, which we never want.
+		args = append(args, "--append-system-prompt", req.SystemPrompt)
+	}
 	mode := DefaultPermissionMode
 	if m, ok := req.Extra["permission_mode"]; ok {
 		mode = m
@@ -120,7 +125,7 @@ func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit ada
 
 	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req)...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = append(os.Environ(), req.Env...)
+	cmd.Env = append(append(os.Environ(), req.Env...), req.MCPEnv()...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

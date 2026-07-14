@@ -6,6 +6,27 @@ live in `<data>/config.json` — see `docs/config.example.json` and
 OPENAI_API_KEY); swival → `extra: {provider: generic, base_url: ...}`;
 claude/codex → their own env/config conventions.
 
+Context bootstrap (Step 26): when the MCP/REST callback channel is on,
+the engine appends a system-prompt fragment telling the client how to
+fetch the conversation transcript (get_turns tool / GET /context) and
+which env var carries the bearer token (AGENTCHAT_MCP_TOKEN — injected
+into every client's process env, never argv or prompt text). Delivery
+per client, each verified against the installed binary:
+- claude 2.1.206 → `--append-system-prompt` (appends to the preset;
+  `--system-prompt` would REPLACE it). ✅ live-verified: the model
+  quoted the fragment's /context path and token env var back.
+- codex 0.142.5 → `-c developer_instructions="…"` (TOML-quoted; both
+  `instructions` and `developer_instructions` pass --strict-config, and
+  developer_instructions was ✅ live-verified: an injected marker
+  instruction was followed).
+- swival 1.0.25 → `--system-prompt` ("System prompt to include").
+- aider 0.86.2 → NO system-prompt flag exists (external docs claiming
+  `--system-prompt-extras` are wrong for this version); the fragment
+  travels as a temp file attached read-only via `--read` (aider itself
+  cannot execute REST calls, so for aider the fragment is orientation
+  text; inlining recent turns into that file is possible future work).
+Disable per turn with Extra["context_bootstrap"]="false".
+
 Model and effort pickers are per client: adapters advertise the levels
 verified against their installed versions (see each section), and
 config.json can append or replace both lists (`clients.<name>.models` /

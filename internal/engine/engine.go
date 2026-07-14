@@ -133,6 +133,18 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 		})
 		defer ch.Close()
 		req.MCP = &adapter.MCPServerInfo{Name: "agentchat", URL: e.MCP.URL(), Token: ch.Token}
+
+		// Tell the client how to reach the conversation context (Step
+		// 26). Appended to any caller-supplied system prompt; disable
+		// per turn with Extra["context_bootstrap"]="false".
+		if req.Extra["context_bootstrap"] != "false" {
+			frag := contextBootstrap(req.MCP)
+			if req.SystemPrompt != "" {
+				req.SystemPrompt += "\n\n" + frag
+			} else {
+				req.SystemPrompt = frag
+			}
+		}
 	}
 
 	res, runErr := a.RunTurn(ctx, req, emit)
@@ -164,6 +176,29 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 	default:
 		return finished, runErr
 	}
+}
+
+// contextBootstrap is the system-prompt fragment that tells a coding
+// client how to reach the conversation's state during the turn. The
+// bearer token itself is never in this text (or argv) — only the name of
+// the environment variable that carries it.
+func contextBootstrap(mcp *adapter.MCPServerInfo) string {
+	base := strings.TrimSuffix(mcp.URL, "/mcp")
+	return fmt.Sprintf(`[AgentChat context]
+This turn is part of a multi-turn conversation managed by the AgentChat
+desktop app. Earlier turns may have been executed by OTHER coding agents
+working on this same workspace; the app stores the full transcript,
+per-turn results, and artifacts. To orient yourself, fetch the
+conversation transcript:
+- MCP server %q (when available to you): call the get_turns tool
+  (optional last_n limits it to the most recent turns). Also available:
+  progress (stream a status update to the user) and add_artifact (save a
+  workspace file into the conversation's artifact library).
+- REST: GET %s/context?last_n=N (omit last_n for all turns) returns the
+  transcript as markdown. Authenticate with the header
+  "Authorization: Bearer $%s" — the token is in that environment
+  variable of this process. Never print or echo the token.`,
+		mcp.Name, base, adapter.MCPTokenEnv)
 }
 
 // renderContext renders the conversation's transcript as markdown for

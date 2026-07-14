@@ -69,12 +69,15 @@ func (a *Adapter) Efforts() []string {
 }
 
 // buildArgs constructs the CLI arguments for a turn. Kept separate from
-// RunTurn for unit testing.
+// RunTurn for unit testing. contextFile, when non-empty, is a temp file
+// holding req.SystemPrompt, attached read-only with --read — aider 0.86.2
+// has no append-to-system-prompt flag, so a read-only context file is the
+// closest supported mechanism (RunTurn owns the file's lifecycle).
 //
 // SessionID has no aider equivalent and is ignored; continuity comes from
 // aider's history files in the workspace. Extra["restore_chat_history"]
 // = "true" reloads them at the start of the turn.
-func buildArgs(req adapter.TurnRequest) []string {
+func buildArgs(req adapter.TurnRequest, contextFile string) []string {
 	args := []string{
 		"--message", req.Prompt,
 		"--yes-always", // never block on confirmation prompts
@@ -89,6 +92,9 @@ func buildArgs(req adapter.TurnRequest) []string {
 		// that support it (flag exists on aider 0.86.2).
 		args = append(args, "--reasoning-effort", req.Effort)
 	}
+	if contextFile != "" {
+		args = append(args, "--read", contextFile)
+	}
 	if req.Extra["restore_chat_history"] == "true" {
 		args = append(args, "--restore-chat-history")
 	}
@@ -102,9 +108,30 @@ func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit ada
 	// Record the git state before the run; empty when not a repo.
 	before := gitHead(ctx, req.WorkDir)
 
-	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req)...)
+	// System-prompt text travels as a read-only context file (see
+	// buildArgs). Outside the workspace so snapshots never capture it.
+	contextFile := ""
+	if req.SystemPrompt != "" {
+		f, err := os.CreateTemp("", "agentchat-context-*.md")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := f.WriteString(req.SystemPrompt); err != nil {
+			f.Close()
+			os.Remove(f.Name())
+			return nil, err
+		}
+		if err := f.Close(); err != nil {
+			os.Remove(f.Name())
+			return nil, err
+		}
+		contextFile = f.Name()
+		defer os.Remove(contextFile)
+	}
+
+	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req, contextFile)...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = append(os.Environ(), req.Env...)
+	cmd.Env = append(append(os.Environ(), req.Env...), req.MCPEnv()...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

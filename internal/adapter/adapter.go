@@ -40,6 +40,13 @@ type TurnRequest struct {
 	// extremes like claude's xhigh/max). Adapters map it to the client's
 	// flag and only drop it when the client has no effort control at all.
 	Effort string
+	// SystemPrompt is extra system-level instruction text delivered
+	// ALONGSIDE the client's own system prompt, never replacing it
+	// (e.g. the engine's conversation-context bootstrap). Adapters map
+	// it to their client's mechanism: claude --append-system-prompt,
+	// codex -c developer_instructions, swival --system-prompt, aider a
+	// --read context file. Empty = nothing injected.
+	SystemPrompt string
 	// Env is extra environment (API keys, base URLs such as a LocalAI
 	// endpoint) appended to the client process environment.
 	Env []string
@@ -64,6 +71,22 @@ type MCPServerInfo struct {
 	// Token authorizes exactly this turn's channel ("Authorization:
 	// Bearer <token>"); it is revoked when the turn finishes.
 	Token string
+}
+
+// MCPTokenEnv is the environment variable through which the turn-scoped
+// MCP/REST bearer token reaches the client process. The token never
+// travels in argv (world-readable via /proc) or in prompt text.
+const MCPTokenEnv = "AGENTCHAT_MCP_TOKEN"
+
+// MCPEnv returns the extra environment entries for the MCP/REST callback
+// channel, or nil when none is configured for this turn. Every adapter
+// appends this to the client's environment so tools that can execute
+// commands (or read env) can authenticate against the callback server.
+func (r *TurnRequest) MCPEnv() []string {
+	if r.MCP == nil {
+		return nil
+	}
+	return []string{MCPTokenEnv + "=" + r.MCP.Token}
 }
 
 // EmitFunc receives normalized events as the turn progresses. Adapters call

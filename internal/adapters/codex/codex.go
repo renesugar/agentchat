@@ -101,16 +101,25 @@ func buildArgs(req adapter.TurnRequest) []string {
 		// client/model, not at config parse time.
 		args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", req.Effort))
 	}
+	if req.SystemPrompt != "" {
+		// Extra developer/system instructions. Verified LIVE on
+		// codex-cli 0.142.5: with -c developer_instructions the model
+		// followed an injected marker instruction end to end
+		// (`instructions` is also accepted by --strict-config but was
+		// not behavior-verified). tomlQuote because the text is
+		// multi-line and %q emits Go-only escapes TOML rejects.
+		args = append(args, "-c", "developer_instructions="+tomlQuote(req.SystemPrompt))
+	}
 	if req.MCP != nil {
 		// Streamable-HTTP MCP server via config overrides (verified on
 		// codex-cli 0.142.5: `codex mcp add --url/--bearer-token-env-var`
 		// writes exactly these keys). The token itself goes through the
-		// environment (see mcpEnv), never the command line. Placed before
-		// a possible `resume` subcommand — exec-level flags there parse
-		// fine and `resume` re-defines -c as well.
+		// environment (adapter.MCPEnv), never the command line. Placed
+		// before a possible `resume` subcommand — exec-level flags there
+		// parse fine and `resume` re-defines -c as well.
 		args = append(args,
 			"-c", fmt.Sprintf("mcp_servers.%s.url=%q", req.MCP.Name, req.MCP.URL),
-			"-c", fmt.Sprintf("mcp_servers.%s.bearer_token_env_var=%q", req.MCP.Name, mcpTokenEnv),
+			"-c", fmt.Sprintf("mcp_servers.%s.bearer_token_env_var=%q", req.MCP.Name, adapter.MCPTokenEnv),
 		)
 	}
 	if req.SessionID != "" {
@@ -119,17 +128,34 @@ func buildArgs(req adapter.TurnRequest) []string {
 	return append(args, "-")
 }
 
-// mcpTokenEnv is the environment variable codex reads the callback
-// bearer token from (referenced via bearer_token_env_var in buildArgs).
-const mcpTokenEnv = "AGENTCHAT_MCP_TOKEN"
-
-// mcpEnv returns the extra environment entries for the MCP callback
-// channel, if one is configured for this turn.
-func mcpEnv(req adapter.TurnRequest) []string {
-	if req.MCP == nil {
-		return nil
+// tomlQuote renders s as a TOML basic string. Go's %q is close but not
+// safe: it emits \xNN escapes for some control bytes, which TOML rejects
+// (TOML basic strings allow only \b \t \n \f \r \" \\ and \uXXXX).
+func tomlQuote(s string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch r {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\t':
+			b.WriteString(`\t`)
+		case '\r':
+			b.WriteString(`\r`)
+		default:
+			if r < 0x20 {
+				fmt.Fprintf(&b, `\u%04X`, r)
+			} else {
+				b.WriteRune(r)
+			}
+		}
 	}
-	return []string{mcpTokenEnv + "=" + req.MCP.Token}
+	b.WriteByte('"')
+	return b.String()
 }
 
 // RunTurn implements adapter.Adapter.
@@ -138,7 +164,7 @@ func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit ada
 
 	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req)...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = append(append(os.Environ(), req.Env...), mcpEnv(req)...)
+	cmd.Env = append(append(os.Environ(), req.Env...), req.MCPEnv()...)
 	cmd.Stdin = strings.NewReader(req.Prompt)
 
 	stdout, err := cmd.StdoutPipe()

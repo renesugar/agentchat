@@ -140,6 +140,16 @@ func TestBuildArgs(t *testing.T) {
 		t.Errorf("full args:\n got %v\nwant %v", got, want)
 	}
 
+	// SystemPrompt rides on --append-system-prompt (never --system-prompt,
+	// which would replace the preset).
+	got = buildArgs(adapter.TurnRequest{Prompt: "x", SystemPrompt: "[AgentChat context] hello"})
+	want = []string{"-p", "--output-format", "stream-json", "--verbose",
+		"--append-system-prompt", "[AgentChat context] hello",
+		"--permission-mode", "acceptEdits", "--", "x"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("system-prompt args:\n got %v\nwant %v", got, want)
+	}
+
 	// Explicitly empty permission mode drops the flag entirely.
 	got = buildArgs(adapter.TurnRequest{Prompt: "x", Extra: map[string]string{"permission_mode": ""}})
 	for _, a := range got {

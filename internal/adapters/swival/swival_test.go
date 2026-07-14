@@ -49,6 +49,13 @@ func TestBuildArgs(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("extra-override args:\n got %v\nwant %v", got, want)
 	}
+
+	// SystemPrompt maps to --system-prompt.
+	got = buildArgs(adapter.TurnRequest{Prompt: "task", SystemPrompt: "orient yourself"}, "/tmp/r.json")
+	want = []string{"--system-prompt", "orient yourself", "--report", "/tmp/r.json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("system-prompt args:\n got %v\nwant %v", got, want)
+	}
 }
 
 func TestApplyReport(t *testing.T) {

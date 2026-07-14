@@ -31,8 +31,14 @@ point of the app.
    it matches exports byte-for-byte). Each turn gets a revocable bearer
    token, pushes join the turn's normal event stream, and GET /context
    on the same listener is a REST twin of get_turns for clients without
-   MCP support. Stdlib-only (net/http; plain JSON responses — no SSE
-   needed since the server never initiates messages).
+   MCP support. A per-turn system-prompt fragment (Step 26) tells each
+   client how to reach all of this — delivered via the client's own
+   mechanism (claude --append-system-prompt, codex -c
+   developer_instructions, swival --system-prompt, aider a --read
+   file); the bearer token travels only in the process environment
+   (AGENTCHAT_MCP_TOKEN), never argv or prompt text. Stdlib-only
+   (net/http; plain JSON responses — no SSE needed since the server
+   never initiates messages).
 
 2. **Normalized event schema.** Adapters translate client-specific output
    into `adapter.Event` values (`text`, `thinking`, `tool_use`,

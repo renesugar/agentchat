@@ -109,6 +109,11 @@ func buildArgs(req adapter.TurnRequest, reportPath string) []string {
 	if v := req.Extra["max_turns"]; v != "" {
 		args = append(args, "--max-turns", v)
 	}
+	if req.SystemPrompt != "" {
+		// "System prompt to include" (swival 1.0.25 --help) — included
+		// alongside swival's own instructions, not replacing them.
+		args = append(args, "--system-prompt", req.SystemPrompt)
+	}
 	return append(args, "--report", reportPath)
 }
 
@@ -128,7 +133,7 @@ func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit ada
 
 	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req, reportPath)...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = append(os.Environ(), req.Env...)
+	cmd.Env = append(append(os.Environ(), req.Env...), req.MCPEnv()...)
 	cmd.Stdin = strings.NewReader(req.Prompt)
 
 	var stdout bytes.Buffer

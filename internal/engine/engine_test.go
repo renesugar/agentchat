@@ -217,6 +217,31 @@ func (m *mcpAdapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit 
 		m.t.Errorf("MCP.Name = %q", req.MCP.Name)
 	}
 
+	// The context bootstrap fragment (Step 26): tells the client about
+	// get_turns and the REST endpoint, names the token env var, and
+	// NEVER contains the token itself.
+	if req.Extra["context_bootstrap"] == "false" {
+		if req.SystemPrompt != "" {
+			m.t.Errorf("bootstrap not suppressed: %q", req.SystemPrompt)
+		}
+		res := &adapter.Result{ExitCode: 0, FinalText: "suppressed"}
+		emit(adapter.Event{Kind: adapter.EventResult, Result: res})
+		return res, nil
+	}
+	{
+		sp := req.SystemPrompt
+		if !strings.Contains(sp, "get_turns") || !strings.Contains(sp, "/context") ||
+			!strings.Contains(sp, "AGENTCHAT_MCP_TOKEN") {
+			m.t.Errorf("bootstrap fragment incomplete: %q", sp)
+		}
+		if strings.Contains(sp, req.MCP.Token) {
+			m.t.Error("bearer token leaked into the system prompt")
+		}
+		if env := req.MCPEnv(); len(env) != 1 || env[0] != "AGENTCHAT_MCP_TOKEN="+req.MCP.Token {
+			m.t.Errorf("MCPEnv = %v", env)
+		}
+	}
+
 	if code, _ := m.rpc(req.MCP, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`); code != 200 {
 		m.t.Errorf("initialize: status %d", code)
 	}
@@ -345,5 +370,13 @@ func TestRunTurnMCPCallback(t *testing.T) {
 	code, _ := m.rpc(&adapter.MCPServerInfo{URL: srv.URL(), Token: "not-a-real-token"}, `{"jsonrpc":"2.0","id":9,"method":"ping"}`)
 	if code != 401 {
 		t.Errorf("post-turn request: status %d, want 401", code)
+	}
+
+	// Extra["context_bootstrap"]="false" suppresses the fragment (the
+	// adapter asserts SystemPrompt is empty and returns early).
+	if _, err := eng.RunTurn(ctx, conv.ID, "mcpfake", ws, adapter.TurnRequest{
+		Prompt: "again", Extra: map[string]string{"context_bootstrap": "false"},
+	}, nil); err != nil {
+		t.Fatal(err)
 	}
 }

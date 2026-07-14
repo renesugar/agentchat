@@ -87,7 +87,7 @@ func TestParseTokenCount(t *testing.T) {
 }
 
 func TestBuildArgs(t *testing.T) {
-	got := buildArgs(adapter.TurnRequest{Prompt: "fix the bug"})
+	got := buildArgs(adapter.TurnRequest{Prompt: "fix the bug"}, "")
 	want := []string{"--message", "fix the bug", "--yes-always", "--no-stream", "--no-pretty"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("default args:\n got %v\nwant %v", got, want)
@@ -96,9 +96,10 @@ func TestBuildArgs(t *testing.T) {
 	got = buildArgs(adapter.TurnRequest{
 		Prompt: "continue", Model: "sonnet", SessionID: "ignored", Effort: "high",
 		Extra: map[string]string{"restore_chat_history": "true"},
-	})
+	}, "/tmp/ctx.md")
 	want = []string{"--message", "continue", "--yes-always", "--no-stream", "--no-pretty",
-		"--model", "sonnet", "--reasoning-effort", "high", "--restore-chat-history"}
+		"--model", "sonnet", "--reasoning-effort", "high",
+		"--read", "/tmp/ctx.md", "--restore-chat-history"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("full args:\n got %v\nwant %v", got, want)
 	}

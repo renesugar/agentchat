@@ -470,26 +470,26 @@ in a compiling state**.
   over both MCP and REST and sees turn 1's content exactly when it
   should.
 
-- [ ] **Step 26 — Context bootstrap system prompt per client.** Tell each
-  client HOW to use Step 25 (tool names, REST URL, token env) via a
-  short system-prompt fragment generated per turn. Delivery differs per
-  client — VERIFY each flag against the installed binary before coding
-  (AGENTS.md rule 5) and record in docs/adapters.md:
-  claude → `--append-system-prompt` (verify; the reference doc's
-  `--system-prompt` REPLACES the preset — we want append);
-  swival → `--system-prompt` (verify against swival 1.0.25 --help;
-  possibly plus --no-instructions interplay);
-  aider → no true system-prompt flag: try `--system-prompt-extras
-  <file>` if the installed 0.86.2 has it, else fall back to a
-  `--read <tmpfile>` context file;
-  codex → no flag: use `-c` config override if one exists for
-  developer/user instructions (check `codex exec --help` and config
-  docs; experimental_instructions_file?) else prepend a bracketed
-  preamble to the stdin prompt (never write AGENTS.md into user repos —
-  Step 18 red line).
-  MCP-capable clients (claude/codex) already discover the tools; the
-  fragment mainly helps aider/swival via REST + token env var
-  (AGENTCHAT_MCP_TOKEN already exists for codex — generalize).
+- [x] **Step 26 — Context bootstrap system prompt per client.**
+  `TurnRequest.SystemPrompt` (extra system text, never replacing the
+  client's own); the engine appends a per-turn fragment describing the
+  get_turns tool, the GET /context REST endpoint (concrete URL), and
+  the AGENTCHAT_MCP_TOKEN env var — the token itself never appears in
+  prompt text or argv, and every adapter now injects it via the shared
+  adapter.MCPEnv (codex's private helper generalized). Delivery, each
+  VERIFIED against the installed binary: claude 2.1.206
+  `--append-system-prompt` (✅ live: model quoted /context + env var
+  back); codex 0.142.5 `-c developer_instructions=` with a proper
+  tomlQuote (Go %q emits \xNN escapes TOML rejects; both `instructions`
+  and `developer_instructions` pass --strict-config, the latter ✅
+  live-verified via marker-instruction probe on gpt-5.4-mini); swival
+  1.0.25 `--system-prompt`; aider 0.86.2 has NO system-prompt flag
+  (`--system-prompt-extras` does not exist in this version — external
+  docs wrong) → fragment travels as a temp file via `--read`, created
+  and cleaned by RunTurn outside the workspace so snapshots never see
+  it. Extra["context_bootstrap"]="false" suppresses the fragment.
+  Tests: buildArgs per adapter, tomlQuote table, MCPEnv, engine round
+  trip asserting fragment contents + no token leak + suppression.
 
 - [ ] **Step 27 — Provider model (core) + platform secrets.** A Provider
   is a named way to reach models for a client; per client the picker

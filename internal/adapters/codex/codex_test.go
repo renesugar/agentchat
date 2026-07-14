@@ -173,12 +173,37 @@ func TestBuildArgsMCP(t *testing.T) {
 			t.Errorf("token leaked into argv: %v", got)
 		}
 	}
-	env := mcpEnv(adapter.TurnRequest{MCP: mcp})
-	if !reflect.DeepEqual(env, []string{"AGENTCHAT_MCP_TOKEN=tok123"}) {
-		t.Errorf("mcpEnv = %v", env)
+	r := adapter.TurnRequest{MCP: mcp}
+	if env := r.MCPEnv(); !reflect.DeepEqual(env, []string{"AGENTCHAT_MCP_TOKEN=tok123"}) {
+		t.Errorf("MCPEnv = %v", env)
 	}
-	if mcpEnv(adapter.TurnRequest{}) != nil {
-		t.Error("mcpEnv without MCP should be nil")
+	none := adapter.TurnRequest{}
+	if none.MCPEnv() != nil {
+		t.Error("MCPEnv without MCP should be nil")
+	}
+}
+
+func TestBuildArgsSystemPrompt(t *testing.T) {
+	got := buildArgs(adapter.TurnRequest{Prompt: "go", SystemPrompt: "line one\nline \"two\""})
+	want := []string{"exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check",
+		"-c", `developer_instructions="line one\nline \"two\""`, "-"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("system-prompt args:\n got %v\nwant %v", got, want)
+	}
+}
+
+func TestTomlQuote(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"plain", `"plain"`},
+		{"a\nb\tc", `"a\nb\tc"`},
+		{`quote " and \ slash`, `"quote \" and \\ slash"`},
+		{"ctrl\x01char", `"ctrl\u0001char"`},
+		{"unicode ünïcode", `"unicode ünïcode"`},
+	}
+	for _, c := range cases {
+		if got := tomlQuote(c.in); got != c.want {
+			t.Errorf("tomlQuote(%q) = %s, want %s", c.in, got, c.want)
+		}
 	}
 }
 
