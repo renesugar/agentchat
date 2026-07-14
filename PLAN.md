@@ -370,6 +370,9 @@ in a compiling state**.
   List order/sources.
 
 - [ ] **Step 22 — Per-client API-key environment configuration.**
+  ⚠ SUPERSEDED by Step 27 (provider model, which covers key sourcing via
+  platform secret stores and per-provider env). Do not implement
+  separately; kept for the design notes below.
   Let users choose, per client, WHICH environment variable holds the
   API key — and whether one is used at all (subscription vs. API
   billing; cf. free-claude-code-style setups that redirect clients via
@@ -448,6 +451,107 @@ in a compiling state**.
     has focus did not close the <dialog> — decide whether it's webkit
     popup-consumes-Escape behavior or a bug worth a keydown handler).
   - Fix anything found; screenshot evidence per finding.
+
+- [ ] **Step 25 — Conversation context over MCP/REST.** The app owns the
+  transcript, per-turn records, and artifacts; the coding client may need
+  them mid-turn to orient itself. Extend `internal/mcpserver` (Step 12):
+  - New MCP tool `get_turns`: optional `last_n` (omit/0 = all) returns
+    the conversation transcript as markdown — per turn the prompt,
+    client/model/effort, response, file changes, snapshot — rendered
+    with export.TurnMarkdown so it matches exports exactly. The
+    in-flight turn appears with whatever events have streamed so far.
+  - REST twin for non-MCP consumption: `GET /context[?last_n=N]` on the
+    same loopback listener, same turn-scoped bearer token, returns
+    text/markdown.
+  - Wiring: `Sink.Context func(lastN int) (string, error)`; the engine
+    supplies it from Store reads + export.TurnMarkdown, serialized with
+    the emit mutex so reads don't race event appends.
+  - Tests: tool + REST paths (auth, last_n trimming), engine round trip
+    where the client fetches context during turn 2 and sees turn 1.
+
+- [ ] **Step 26 — Context bootstrap system prompt per client.** Tell each
+  client HOW to use Step 25 (tool names, REST URL, token env) via a
+  short system-prompt fragment generated per turn. Delivery differs per
+  client — VERIFY each flag against the installed binary before coding
+  (AGENTS.md rule 5) and record in docs/adapters.md:
+  claude → `--append-system-prompt` (verify; the reference doc's
+  `--system-prompt` REPLACES the preset — we want append);
+  swival → `--system-prompt` (verify against swival 1.0.25 --help;
+  possibly plus --no-instructions interplay);
+  aider → no true system-prompt flag: try `--system-prompt-extras
+  <file>` if the installed 0.86.2 has it, else fall back to a
+  `--read <tmpfile>` context file;
+  codex → no flag: use `-c` config override if one exists for
+  developer/user instructions (check `codex exec --help` and config
+  docs; experimental_instructions_file?) else prepend a bracketed
+  preamble to the stdin prompt (never write AGENTS.md into user repos —
+  Step 18 red line).
+  MCP-capable clients (claude/codex) already discover the tools; the
+  fragment mainly helps aider/swival via REST + token env var
+  (AGENTCHAT_MCP_TOKEN already exists for codex — generalize).
+
+- [ ] **Step 27 — Provider model (core) + platform secrets.** A Provider
+  is a named way to reach models for a client; per client the picker
+  offers at least "subscription/default" plus configured providers.
+  - `internal/provider`: types + resolution. Sources: (a) config.json
+    providers (existing env maps, extended with optional base_url,
+    api_key_secret); (b) codex: READ-ONLY parse of ~/.codex/config.toml
+    `[model_providers.*]` → name, base_url, env_key (plus implicit
+    "subscription" default; NEVER write that file — Step 18 red line);
+    (c) claude: "subscription" (default, injects nothing) vs "api"
+    (ANTHROPIC_BASE_URL + ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN);
+    (d) aider/swival: providers named in config (openrouter, localai…)
+    mapping to their env conventions (OPENROUTER_API_KEY etc.) and,
+    for swival, --provider/--base-url flags.
+  - Secrets: key VALUES come from the platform secret store at turn
+    time, never stored in the clear and never in argv. Linux:
+    `secret-tool lookup <attr>=<val>...` (config carries only the
+    lookup attributes); design leaves room for macOS `security` /
+    Windows credman later. Config gets e.g.
+    `providers.<name>.api_key_secret = {"provider":"openrouter",
+    "token_type":"api_key"}`; resolution shells out, trims, injects as
+    the provider's env_key. Missing tool/entry = loud per-turn error.
+  - TOML parsing for codex config: stdlib-only minimal parser for the
+    needed subset (tables + string keys) or a tiny vendored decoder —
+    note the dependency decision in ARCHITECTURE.md if one is added.
+  - Tests: codex TOML fixture parse; provider resolution precedence;
+    secret lookup via a stub secret-tool on PATH; subscription
+    providers inject nothing.
+
+- [ ] **Step 28 — Adapter provider wiring.** `TurnRequest.Provider`
+  (name) resolved by the engine/clients layer into env + flags:
+  claude → env only (subscription = inject nothing; api = base URL +
+  key env, with ANTHROPIC_API_KEY explicitly emptied when using
+  AUTH_TOKEN per OpenRouter docs — verify live);
+  codex → `-c model_provider="<name>"` per turn (subscription = omit);
+  aider → provider env set + model-slug convention (openrouter/…);
+  swival → `--provider` (+ `--base-url` for generic). Availability
+  checks stay provider-agnostic. buildArgs tests per adapter; live
+  verification where a key exists, else flag-parse verification
+  recorded in docs/adapters.md.
+
+- [ ] **Step 29 — Cascading pickers: Provider → Model → Effort.**
+  Client picker stays first; choosing a client populates its Provider
+  dropdown (ProviderLister capability + config merge), choosing a
+  provider populates Models (per-provider model lists from config;
+  codex providers may also carry a default model from config.toml),
+  and Model populates Effort (existing efforts, possibly filtered per
+  provider later). AdapterInfo grows a providers[] tree so the
+  frontend cascades without extra round trips. Config example +
+  docs; GUI verified via the Step 23/24 harness.
+
+- [ ] **Step 30 — Composer redesign (per agentchat_lighttheme_new.png).**
+  One rounded input bubble containing: the prompt textarea (grows to a
+  cap, then scrolls internally), a bottom control row with [+] attach
+  (native file/dir chooser; chosen paths render as removable reference
+  chips inside the bubble and are appended to the prompt as
+  workspace-relative references), the Coding Client / Provider /
+  Model / Model Effort selects (Step 29), and a circular ↑ run button.
+  Light/dark theme toggle moves into the conversation header (sun/moon
+  switch per the mock) alongside Make project…/Move…. Keep the
+  Settings-dialog theme select for full theme choice; the toggle flips
+  between the built-in pair. Verify with the GUI harness in both
+  themes.
 
 ## Notes for the next implementing agent (handoff, 2026-07-11)
 
