@@ -48,8 +48,10 @@ and update this file in the same commit.
   "url":..., "headers":{"Authorization":"Bearer <token>"}}}}'` and
   `--allowedTools mcp__agentchat` (bare server name pre-approves its
   tools; -p mode cannot prompt). ✅ Verified live on claude 2.1.206:
-  the client called both `mcp__agentchat__progress` and
-  `mcp__agentchat__add_artifact` end to end.
+  the client called `mcp__agentchat__progress` and
+  `mcp__agentchat__add_artifact` end to end, and (2026-07-14, Step 25)
+  `mcp__agentchat__get_turns` — it fetched the conversation transcript
+  mid-turn and quoted turn 1's exact prompt text back.
 
 ## codex (Codex CLI) — Step 4 ✅ implemented, ✅ verified live against codex-cli 0.142.5 (2026-07-10)
     codex exec --json --sandbox workspace-write --skip-git-repo-check \

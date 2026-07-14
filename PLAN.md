@@ -452,22 +452,23 @@ in a compiling state**.
     popup-consumes-Escape behavior or a bug worth a keydown handler).
   - Fix anything found; screenshot evidence per finding.
 
-- [ ] **Step 25 — Conversation context over MCP/REST.** The app owns the
-  transcript, per-turn records, and artifacts; the coding client may need
-  them mid-turn to orient itself. Extend `internal/mcpserver` (Step 12):
-  - New MCP tool `get_turns`: optional `last_n` (omit/0 = all) returns
-    the conversation transcript as markdown — per turn the prompt,
-    client/model/effort, response, file changes, snapshot — rendered
-    with export.TurnMarkdown so it matches exports exactly. The
-    in-flight turn appears with whatever events have streamed so far.
-  - REST twin for non-MCP consumption: `GET /context[?last_n=N]` on the
-    same loopback listener, same turn-scoped bearer token, returns
-    text/markdown.
-  - Wiring: `Sink.Context func(lastN int) (string, error)`; the engine
-    supplies it from Store reads + export.TurnMarkdown, serialized with
-    the emit mutex so reads don't race event appends.
-  - Tests: tool + REST paths (auth, last_n trimming), engine round trip
-    where the client fetches context during turn 2 and sees turn 1.
+- [x] **Step 25 — Conversation context over MCP/REST.** The app owns the
+  transcript, per-turn records, and artifacts; coding clients can now
+  pull them mid-turn. `internal/mcpserver` gains the `get_turns` tool
+  (optional `last_n`; omit/0 = full transcript) returning markdown —
+  header "(n of m turns)" + per-turn sections rendered with
+  export.TurnMarkdown so mid-turn context matches exports byte-for-byte;
+  the in-flight turn appears with whatever events have streamed so far.
+  REST twin `GET /context[?last_n=N]` on the same loopback listener and
+  turn-scoped bearer token (text/markdown; 400 bad last_n, 401 bad
+  token, 404 when no context source) for clients without MCP support.
+  Wiring: `Sink.Context func(lastN int)`; the engine supplies it via
+  renderContext (Store reads + TurnMarkdown) under the emit mutex so
+  reads never race event appends from HTTP goroutines. Tests: tool +
+  REST auth/trim/validation matrix in mcpserver; engine round trip
+  where the fake client fetches full and last_n=1 context during turn 2
+  over both MCP and REST and sees turn 1's content exactly when it
+  should.
 
 - [ ] **Step 26 — Context bootstrap system prompt per client.** Tell each
   client HOW to use Step 25 (tool names, REST URL, token env) via a

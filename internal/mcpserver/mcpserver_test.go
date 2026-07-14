@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -109,7 +110,7 @@ func TestServerLifecycle(t *testing.T) {
 		t.Errorf("notification: status %d body %v, want 202 empty", resp.StatusCode, rrN)
 	}
 
-	// tools/list exposes exactly progress and add_artifact.
+	// tools/list exposes exactly progress, get_turns, and add_artifact.
 	rr = call(t, srv.URL(), ch.Token, "tools/list", `{}`)
 	var listed struct {
 		Tools []struct {
@@ -124,8 +125,9 @@ func TestServerLifecycle(t *testing.T) {
 	for _, tool := range listed.Tools {
 		names = append(names, tool.Name)
 	}
-	if len(names) != 2 || names[0] != "progress" || names[1] != "add_artifact" {
-		t.Errorf("tools = %v, want [progress add_artifact]", names)
+	want := []string{"progress", "get_turns", "add_artifact"}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("tools = %v, want %v", names, want)
 	}
 
 	// progress lands in the sink as a thinking event.
@@ -192,6 +194,82 @@ func TestServerLifecycle(t *testing.T) {
 	resp, _ = post(t, srv.URL(), ch.Token, `{"jsonrpc":"2.0","id":1,"method":"ping"}`)
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("closed channel: status %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestContextToolAndREST(t *testing.T) {
+	srv, err := Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	var asked []int
+	ch := srv.Register(Sink{
+		Emit: func(adapter.Event) {},
+		Context: func(lastN int) (string, error) {
+			asked = append(asked, lastN)
+			return fmt.Sprintf("TRANSCRIPT lastN=%d", lastN), nil
+		},
+	})
+	defer ch.Close()
+
+	// MCP tool: no args = full transcript; last_n trims.
+	rr := call(t, srv.URL(), ch.Token, "tools/call", `{"name":"get_turns","arguments":{}}`)
+	if rr.Error != nil {
+		t.Fatalf("get_turns: %+v", rr.Error)
+	}
+	rr = call(t, srv.URL(), ch.Token, "tools/call", `{"name":"get_turns","arguments":{"last_n":2}}`)
+	if rr.Error != nil {
+		t.Fatalf("get_turns last_n: %+v", rr.Error)
+	}
+	// Negative last_n is a tool-level error and never reaches the sink.
+	rr = call(t, srv.URL(), ch.Token, "tools/call", `{"name":"get_turns","arguments":{"last_n":-1}}`)
+	if m := resultMap(t, rr); m["isError"] != true {
+		t.Errorf("negative last_n accepted: %v", m)
+	}
+
+	// REST twin: GET /context with the same bearer token.
+	restURL := strings.Replace(srv.URL(), "/mcp", "/context", 1)
+	get := func(url, token string) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	if code, body := get(restURL, ch.Token); code != 200 || body != "TRANSCRIPT lastN=0" {
+		t.Errorf("GET /context = %d %q", code, body)
+	}
+	if code, body := get(restURL+"?last_n=3", ch.Token); code != 200 || body != "TRANSCRIPT lastN=3" {
+		t.Errorf("GET /context?last_n=3 = %d %q", code, body)
+	}
+	if code, _ := get(restURL+"?last_n=nope", ch.Token); code != 400 {
+		t.Errorf("bad last_n: status %d, want 400", code)
+	}
+	if code, _ := get(restURL, "wrong"); code != 401 {
+		t.Errorf("bad token: status %d, want 401", code)
+	}
+	if wantAsked := []int{0, 2, 0, 3}; !reflect.DeepEqual(asked, wantAsked) {
+		t.Errorf("sink saw lastN=%v, want %v", asked, wantAsked)
+	}
+
+	// A sink without Context: tool-level error and REST 404.
+	ch2 := srv.Register(Sink{Emit: func(adapter.Event) {}})
+	defer ch2.Close()
+	rr = call(t, srv.URL(), ch2.Token, "tools/call", `{"name":"get_turns","arguments":{}}`)
+	if m := resultMap(t, rr); m["isError"] != true {
+		t.Errorf("get_turns without Context: %v", m)
+	}
+	if code, _ := get(restURL, ch2.Token); code != 404 {
+		t.Errorf("REST without Context: status %d, want 404", code)
 	}
 }
 

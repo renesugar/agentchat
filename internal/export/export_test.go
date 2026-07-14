@@ -14,9 +14,7 @@ import (
 	"testing"
 
 	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/echo"
 	"github.com/example/agentchat/internal/artifact"
-	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
 )
@@ -317,22 +315,31 @@ func TestBundleImportRoundTrip(t *testing.T) {
 	}
 
 	// Workspace materialized with the snapshot tree, usable for a next
-	// turn (a real echo turn runs and snapshots in it).
+	// turn: the store's sequence continues and the snapshot chain
+	// extends in the new location. (Exercised via store + workspace
+	// directly — importing engine here would create a test-only import
+	// cycle, since engine renders MCP context through this package.)
 	if restoredWS == nil {
 		t.Fatal("import returned no workspace despite workspace.zip")
 	}
 	if b, err := os.ReadFile(filepath.Join(restoredWS.Dir, "hello.py")); err != nil || string(b) != "print('hi')\n" {
 		t.Fatalf("restored workspace tree: %q, %v", b, err)
 	}
-	reg := adapter.NewRegistry()
-	reg.Register(echo.New())
-	eng := engine.New(reg, store)
-	turn, err := eng.RunTurn(ctx, convID, "echo", restoredWS, adapter.TurnRequest{Prompt: "continue"}, nil)
+	turn, err := store.BeginTurn(ctx, convID, transcript.NewTurn{
+		Client: "echo", Prompt: "continue", WorkspaceRef: restoredWS.Dir,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if turn.Seq != 3 || turn.SnapshotID == "" {
-		t.Fatalf("next turn after import: seq=%d snapshot=%q", turn.Seq, turn.SnapshotID)
+	if turn.Seq != 3 {
+		t.Fatalf("next turn seq = %d, want 3", turn.Seq)
+	}
+	snap, err := restoredWS.Snapshot(ctx, "post-import")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.FinishTurn(ctx, convID, turn.ID, &adapter.Result{ExitCode: 0}, snap.Commit, nil); err != nil {
+		t.Fatal(err)
 	}
 
 	// The imported-workspace link artifact records the new location.

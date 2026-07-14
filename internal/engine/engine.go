@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/example/agentchat/internal/adapter"
+	"github.com/example/agentchat/internal/export"
 	"github.com/example/agentchat/internal/mcpserver"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
@@ -120,6 +121,15 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 				}
 				return e.ArtifactSink(ctx, convID, turn.ID, resolved, note)
 			},
+			// Context renders the transcript so far (the in-flight turn
+			// included, with whatever events have streamed). Holding the
+			// emit mutex keeps store reads from racing event appends —
+			// context requests arrive on HTTP handler goroutines.
+			Context: func(lastN int) (string, error) {
+				emitMu.Lock()
+				defer emitMu.Unlock()
+				return renderContext(ctx, e.Store, convID, lastN)
+			},
 		})
 		defer ch.Close()
 		req.MCP = &adapter.MCPServerInfo{Name: "agentchat", URL: e.MCP.URL(), Token: ch.Token}
@@ -154,6 +164,33 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 	default:
 		return finished, runErr
 	}
+}
+
+// renderContext renders the conversation's transcript as markdown for
+// the MCP get_turns tool / REST /context endpoint: the same per-turn
+// sections exports use (export.TurnMarkdown), so what a client reads
+// mid-turn matches what a user exports. lastN <= 0 means all turns.
+func renderContext(ctx context.Context, store transcript.Store, convID string, lastN int) (string, error) {
+	turns, err := store.ListTurns(ctx, convID)
+	if err != nil {
+		return "", err
+	}
+	total := len(turns)
+	if lastN > 0 && total > lastN {
+		turns = turns[total-lastN:]
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Conversation transcript (%d of %d turns)\n", len(turns), total)
+	b.WriteString("\nTurns may have been executed by different coding agents on this same workspace.\n")
+	for _, t := range turns {
+		events, err := store.Events(ctx, convID, t.ID)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString("\n---\n\n")
+		b.Write(export.TurnMarkdown(t, events))
+	}
+	return b.String(), nil
 }
 
 // resolveInWorkspace resolves an MCP-supplied artifact path against the

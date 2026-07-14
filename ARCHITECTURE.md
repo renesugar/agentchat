@@ -22,12 +22,17 @@ point of the app.
    supported client has a non-interactive mode whose stdout we can parse
    (JSON streams for claude/codex; line output + git commits for aider).
    Building on stdout works uniformly; the MCP callback channel
-   (`internal/mcpserver`, Step 12) is an enhancement for clients that
-   support it, never a requirement: a loopback streamable-HTTP MCP
-   server offers `progress` and `add_artifact` tools, each turn gets a
-   revocable bearer token, and pushes join the turn's normal event
-   stream. Stdlib-only (net/http; plain JSON responses — no SSE needed
-   since the server never initiates messages).
+   (`internal/mcpserver`, Steps 12 + 25) is an enhancement for clients
+   that support it, never a requirement: a loopback streamable-HTTP MCP
+   server offers `progress`, `add_artifact`, and `get_turns` (the
+   conversation transcript as markdown — the app owns transcript/turn/
+   artifact state, and a client can pull the last n turns or all of
+   them to orient itself mid-turn; rendered with export.TurnMarkdown so
+   it matches exports byte-for-byte). Each turn gets a revocable bearer
+   token, pushes join the turn's normal event stream, and GET /context
+   on the same listener is a REST twin of get_turns for clients without
+   MCP support. Stdlib-only (net/http; plain JSON responses — no SSE
+   needed since the server never initiates messages).
 
 2. **Normalized event schema.** Adapters translate client-specific output
    into `adapter.Event` values (`text`, `thinking`, `tool_use`,
@@ -116,7 +121,8 @@ internal/transcript/   Store iface + FSStore: conversations, turns, event logs
 internal/engine/       runs a turn via an adapter and persists it to the store
 internal/workspace/    Step 7: repo/worktree/scratch + per-turn snapshots
 internal/artifact/     Step 8: artifact library
-internal/mcpserver/    Step 12: loopback MCP callback server (progress/artifacts)
+internal/mcpserver/    Steps 12+25: loopback MCP/REST callback server
+                       (progress, artifacts, conversation context)
 internal/theme/        Step 21: UI color themes (built-in + user JSON files)
 app/                   Wails desktop app — NESTED module (own go.mod with a
                        replace to the core) so the root stays dependency-free;

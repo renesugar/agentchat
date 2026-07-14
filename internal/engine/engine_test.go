@@ -239,6 +239,34 @@ func (m *mcpAdapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit 
 		m.t.Errorf("escaping add_artifact: status %d body %s, want isError", code, body)
 	}
 
+	// Conversation context mid-turn: the full transcript includes the
+	// previous echo turn, and this in-flight turn's prompt.
+	if code, body := m.rpc(req.MCP, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_turns","arguments":{}}}`); code != 200 ||
+		!strings.Contains(body, "history marker one") || !strings.Contains(body, "## Turn 1") || !strings.Contains(body, "## Turn 2") {
+		m.t.Errorf("get_turns(all): status %d body %.400s", code, body)
+	}
+	// last_n=1 trims to just the current turn.
+	if code, body := m.rpc(req.MCP, `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_turns","arguments":{"last_n":1}}}`); code != 200 ||
+		strings.Contains(body, "## Turn 1") || !strings.Contains(body, "(1 of 2 turns)") {
+		m.t.Errorf("get_turns(last_n=1): status %d body %.400s", code, body)
+	}
+	// The REST twin serves the same transcript for non-MCP clients.
+	restReq, err := http.NewRequest(http.MethodGet, strings.Replace(req.MCP.URL, "/mcp", "/context", 1)+"?last_n=1", nil)
+	if err != nil {
+		m.t.Fatal(err)
+	}
+	restReq.Header.Set("Authorization", "Bearer "+req.MCP.Token)
+	resp, err := http.DefaultClient.Do(restReq)
+	if err != nil {
+		m.t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.Contains(string(raw), "(1 of 2 turns)") ||
+		resp.Header.Get("Content-Type") != "text/markdown; charset=utf-8" {
+		m.t.Errorf("GET /context: status %d type %q body %.200s", resp.StatusCode, resp.Header.Get("Content-Type"), raw)
+	}
+
 	res := &adapter.Result{ExitCode: 0, FinalText: "done"}
 	emit(adapter.Event{Kind: adapter.EventResult, Result: res})
 	return res, nil
@@ -267,6 +295,7 @@ func TestRunTurnMCPCallback(t *testing.T) {
 
 	reg := adapter.NewRegistry()
 	reg.Register(&mcpAdapter{t: t})
+	reg.Register(echo.New())
 	eng := engine.New(reg, store)
 	eng.MCP = srv
 	type artCall struct{ convID, turnID, path, note string }
@@ -277,6 +306,10 @@ func TestRunTurnMCPCallback(t *testing.T) {
 	}
 
 	conv, _ := store.CreateConversation(ctx, transcript.NewConversation{Title: "mcp"})
+	// Turn 1 (echo) gives the context tool history to serve.
+	if _, err := eng.RunTurn(ctx, conv.ID, "echo", ws, adapter.TurnRequest{Prompt: "history marker one"}, nil); err != nil {
+		t.Fatal(err)
+	}
 	turn, err := eng.RunTurn(ctx, conv.ID, "mcpfake", ws, adapter.TurnRequest{Prompt: "go"}, nil)
 	if err != nil {
 		t.Fatal(err)

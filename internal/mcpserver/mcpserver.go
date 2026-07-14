@@ -11,7 +11,10 @@
 //   - JSON-RPC 2.0 over POST with plain application/json responses (the
 //     spec allows a server to answer without SSE; neither tool needs
 //     server-initiated messages),
-//   - two tools: "progress" and "add_artifact".
+//   - three tools: "progress", "add_artifact", and "get_turns" (the
+//     conversation's transcript as markdown, for orientation mid-turn),
+//   - a REST twin of get_turns at GET /context for clients without MCP
+//     support (same bearer token, text/markdown response).
 package mcpserver
 
 import (
@@ -21,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +52,10 @@ type Sink struct {
 	// returns the artifact ID. Optional: nil makes the add_artifact tool
 	// report that artifact storage is unavailable.
 	AddArtifact func(path, note string) (string, error)
+	// Context renders the conversation transcript as markdown for the
+	// get_turns tool and the GET /context endpoint. lastN <= 0 means all
+	// turns. Optional: nil reports that context is unavailable.
+	Context func(lastN int) (string, error)
 }
 
 // Server is the shared loopback MCP endpoint. Create with Start, hand
@@ -70,6 +78,7 @@ func Start() (*Server, error) {
 	s := &Server{ln: ln, channels: make(map[string]Sink)}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mcp", s.handle)
+	mux.HandleFunc("/context", s.handleContext)
 	s.srv = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = s.srv.Serve(ln) }()
 	return s, nil
@@ -131,6 +140,57 @@ type rpcResponse struct {
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
+// authSink resolves the request's bearer token to its channel Sink,
+// writing 401 (and returning false) for missing or revoked tokens.
+func (s *Server) authSink(w http.ResponseWriter, r *http.Request) (Sink, bool) {
+	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return Sink{}, false
+	}
+	s.mu.Lock()
+	sink, ok := s.channels[token]
+	s.mu.Unlock()
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return Sink{}, false
+	}
+	return sink, true
+}
+
+// handleContext is the REST twin of the get_turns tool, for clients
+// without MCP support: GET /context[?last_n=N] → text/markdown.
+func (s *Server) handleContext(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	sink, ok := s.authSink(w, r)
+	if !ok {
+		return
+	}
+	lastN := 0
+	if v := r.URL.Query().Get("last_n"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			http.Error(w, "last_n must be a non-negative integer", http.StatusBadRequest)
+			return
+		}
+		lastN = n
+	}
+	if sink.Context == nil {
+		http.Error(w, "conversation context is not available in this session", http.StatusNotFound)
+		return
+	}
+	md, err := sink.Context(lastN)
+	if err != nil {
+		http.Error(w, "rendering context: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	_, _ = w.Write([]byte(md))
+}
+
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		// GET would open an SSE stream for server-initiated messages; we
@@ -138,18 +198,8 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-
-	auth := r.Header.Get("Authorization")
-	token, ok := strings.CutPrefix(auth, "Bearer ")
+	sink, ok := s.authSink(w, r)
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	s.mu.Lock()
-	sink, ok := s.channels[token]
-	s.mu.Unlock()
-	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -229,6 +279,24 @@ func toolList() []map[string]any {
 			},
 		},
 		{
+			"name": "get_turns",
+			"description": "Fetch this conversation's transcript as markdown — " +
+				"each turn's prompt, the coding client/model that ran it, its " +
+				"response, file changes, and workspace snapshot. Use it to " +
+				"orient yourself: different turns may have been executed by " +
+				"different coding agents on this same workspace. Pass last_n " +
+				"for only the most recent n turns; omit it for all turns.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"last_n": map[string]any{
+						"type":        "integer",
+						"description": "Return only the most recent n turns (omit or 0 for the full transcript).",
+					},
+				},
+			},
+		},
+		{
 			"name": "add_artifact",
 			"description": "Save a file from the workspace into the AgentChat " +
 				"artifact library, so the user can find and download it after " +
@@ -278,6 +346,24 @@ func callTool(sink Sink, params json.RawMessage) (any, error) {
 			Raw:  json.RawMessage(`{"mcp_tool":"progress"}`),
 		})
 		return toolText("progress recorded"), nil
+
+	case "get_turns":
+		var args struct {
+			LastN int `json:"last_n"`
+		}
+		if len(p.Arguments) > 0 {
+			if err := json.Unmarshal(p.Arguments, &args); err != nil || args.LastN < 0 {
+				return toolError("get_turns takes an optional non-negative integer \"last_n\""), nil
+			}
+		}
+		if sink.Context == nil {
+			return toolError("conversation context is not available in this session"), nil
+		}
+		md, err := sink.Context(args.LastN)
+		if err != nil {
+			return toolError("rendering context: " + err.Error()), nil
+		}
+		return toolText(md), nil
 
 	case "add_artifact":
 		var args struct {
