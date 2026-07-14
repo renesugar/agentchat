@@ -58,6 +58,48 @@ func TestBuildArgs(t *testing.T) {
 	}
 }
 
+func TestProviderFlags(t *testing.T) {
+	cases := []struct {
+		p        *adapter.ProviderInfo
+		prov, ur string
+	}{
+		{nil, "", ""},
+		{&adapter.ProviderInfo{Name: "", Subscription: true}, "", ""},
+		{&adapter.ProviderInfo{Name: "openrouter"}, "openrouter", ""},
+		{&adapter.ProviderInfo{Name: "openrouter", BaseURL: "https://openrouter.ai/api/v1"}, "openrouter", "https://openrouter.ai/api/v1"},
+		// Non-native name with an endpoint → OpenAI-compatible generic.
+		{&adapter.ProviderInfo{Name: "localai", BaseURL: "http://localhost:8080/v1"}, "generic", "http://localhost:8080/v1"},
+		// Non-native without a URL: pass through, swival rejects loudly.
+		{&adapter.ProviderInfo{Name: "mystery"}, "mystery", ""},
+	}
+	for _, c := range cases {
+		prov, url := providerFlags(c.p)
+		if prov != c.prov || url != c.ur {
+			t.Errorf("providerFlags(%+v) = %q,%q; want %q,%q", c.p, prov, url, c.prov, c.ur)
+		}
+	}
+
+	// Extra keys still win over the resolved provider (back-compat).
+	got := buildArgs(adapter.TurnRequest{
+		Prompt:   "task",
+		Provider: &adapter.ProviderInfo{Name: "openrouter"},
+		Extra:    map[string]string{"provider": "lmstudio"},
+	}, "/tmp/r.json")
+	want := []string{"--provider", "lmstudio", "--report", "/tmp/r.json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("extra-wins args:\n got %v\nwant %v", got, want)
+	}
+	// And the resolved provider is used when Extra is silent.
+	got = buildArgs(adapter.TurnRequest{
+		Prompt:   "task",
+		Provider: &adapter.ProviderInfo{Name: "localai", BaseURL: "http://localhost:8080/v1"},
+	}, "/tmp/r.json")
+	want = []string{"--provider", "generic", "--base-url", "http://localhost:8080/v1", "--report", "/tmp/r.json"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("resolved-provider args:\n got %v\nwant %v", got, want)
+	}
+}
+
 func TestApplyReport(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("testdata", "report.json"))
 	if err != nil {

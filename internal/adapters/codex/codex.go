@@ -95,6 +95,13 @@ func buildArgs(req adapter.TurnRequest) []string {
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	if p := req.Provider; p != nil && !p.Subscription && p.Name != "" {
+		// Selects among the providers DECLARED in the user's own
+		// ~/.codex/config.toml — a per-invocation override; the file is
+		// never written. Subscription (the default) omits the flag so
+		// codex uses its own login.
+		args = append(args, "-c", fmt.Sprintf("model_provider=%q", p.Name))
+	}
 	if req.Effort != "" {
 		// Config key verified on codex-cli 0.142.5 (--strict-config
 		// accepts it; unknown keys error). Values are validated by the

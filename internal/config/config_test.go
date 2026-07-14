@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -272,7 +273,9 @@ func TestClientsSet(t *testing.T) {
 
 	// Prepare delegates to Config.Apply.
 	req := adapter.TurnRequest{}
-	set.Prepare("swival", &req)
+	if err := set.Prepare(context.Background(), "swival", &req); err != nil {
+		t.Fatal(err)
+	}
 	if req.Extra["base_url"] == "" {
 		t.Errorf("Prepare did not apply config: %+v", req)
 	}
@@ -281,5 +284,95 @@ func TestClientsSet(t *testing.T) {
 	empty := clients.New(nil)
 	if got := empty.Registry.Names(); !reflect.DeepEqual(got, wantNames) {
 		t.Fatalf("nil-config registry names = %v", got)
+	}
+}
+
+type fakeSecrets struct{ val string }
+
+func (f fakeSecrets) Lookup(context.Context, map[string]string) (string, error) {
+	if f.val == "" {
+		return "", fmt.Errorf("keyring says no")
+	}
+	return f.val, nil
+}
+
+func TestPrepareResolvesProvider(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("TEST_LOCALAI_KEY", "sekrit")
+	c, err := config.Load(writeConfig(t, sample))
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := clients.New(c)
+	set.Secrets = fakeSecrets{val: "sk-or-fake"}
+	set.CodexConfigPath = "" // no codex config in this test
+
+	// Provider "openrouter" for aider: secret resolved into the env,
+	// ProviderInfo enriched with the base URL.
+	req := adapter.TurnRequest{Provider: &adapter.ProviderInfo{Name: "openrouter"}}
+	if err := set.Prepare(ctx, "aider", &req); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, e := range req.Env {
+		if e == "OPENROUTER_API_KEY=sk-or-fake" {
+			found = true
+		}
+		if strings.Contains(e, "sk-or-fake") && !strings.HasPrefix(e, "OPENROUTER_API_KEY=") {
+			t.Errorf("secret in unexpected env entry %q", e)
+		}
+	}
+	if !found {
+		t.Errorf("secret not injected: %v", req.Env)
+	}
+	if req.Provider.BaseURL != "https://openrouter.ai/api/v1" || req.Provider.Subscription {
+		t.Errorf("provider info = %+v", req.Provider)
+	}
+
+	// Secret failures fail Prepare loudly.
+	set.Secrets = fakeSecrets{}
+	req = adapter.TurnRequest{Provider: &adapter.ProviderInfo{Name: "openrouter"}}
+	if err := set.Prepare(ctx, "aider", &req); err == nil || !strings.Contains(err.Error(), "keyring says no") {
+		t.Errorf("secret failure = %v", err)
+	}
+
+	// Unknown provider names error and list what exists; nil/empty is
+	// the client default and resolves nothing.
+	req = adapter.TurnRequest{Provider: &adapter.ProviderInfo{Name: "nope"}}
+	if err := set.Prepare(ctx, "aider", &req); err == nil || !strings.Contains(err.Error(), "openrouter") {
+		t.Errorf("unknown provider err = %v", err)
+	}
+	req = adapter.TurnRequest{}
+	if err := set.Prepare(ctx, "claude", &req); err != nil || len(req.Env) != 0 {
+		t.Errorf("default: env=%v err=%v", req.Env, err)
+	}
+
+	// claude is restricted out of openrouter's clients list.
+	req = adapter.TurnRequest{Provider: &adapter.ProviderInfo{Name: "openrouter"}}
+	if err := set.Prepare(ctx, "claude", &req); err == nil {
+		t.Error("clients restriction not honored")
+	}
+
+	// codex catalogs come from its own config file (read-only).
+	codexToml := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(codexToml, []byte("[model_providers.openrouter]\nname = \"OpenRouter\"\nbase_url = \"https://openrouter.ai/api/v1\"\nenv_key = \"OPENROUTER_API_KEY\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set.Secrets = fakeSecrets{val: "sk-or-fake"}
+	set.CodexConfigPath = codexToml
+	provs, err := set.Providers(ctx, "codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(provs) != 2 || !provs[0].Subscription || provs[1].Name != "openrouter" ||
+		provs[1].KeySecret["provider"] != "openrouter" {
+		t.Fatalf("codex providers = %+v", provs)
+	}
+	req = adapter.TurnRequest{Provider: &adapter.ProviderInfo{Name: "openrouter"}}
+	if err := set.Prepare(ctx, "codex", &req); err != nil {
+		t.Fatal(err)
+	}
+	if len(req.Env) != 1 || req.Env[0] != "OPENROUTER_API_KEY=sk-or-fake" {
+		t.Errorf("codex env = %v", req.Env)
 	}
 }

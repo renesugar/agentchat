@@ -522,17 +522,27 @@ in a compiling state**.
   parser table, config field parsing/validation. Supersedes Step 22.
   Adapter/engine wiring is Step 28; pickers Step 29.
 
-- [ ] **Step 28 — Adapter provider wiring.** `TurnRequest.Provider`
-  (name) resolved by the engine/clients layer into env + flags:
-  claude → env only (subscription = inject nothing; api = base URL +
-  key env, with ANTHROPIC_API_KEY explicitly emptied when using
-  AUTH_TOKEN per OpenRouter docs — verify live);
-  codex → `-c model_provider="<name>"` per turn (subscription = omit);
-  aider → provider env set + model-slug convention (openrouter/…);
-  swival → `--provider` (+ `--base-url` for generic). Availability
-  checks stay provider-agnostic. buildArgs tests per adapter; live
-  verification where a key exists, else flag-parse verification
-  recorded in docs/adapters.md.
+- [x] **Step 28 — Adapter provider wiring.** `TurnRequest.Provider
+  *ProviderInfo` (callers set Name; `Set.Prepare` — now ctx-aware and
+  error-returning — resolves it via the Step 27 catalog: fills
+  BaseURL/Subscription, appends the provider's env with the API key
+  fetched from the platform secret store; unknown names error listing
+  what exists; nil/"" = client default, resolves nothing). Adapter
+  mapping: claude → providerEnv injects ANTHROPIC_BASE_URL unless the
+  env map already sets it (key/AUTH_TOKEN nuances live in config env
+  maps); codex → `-c model_provider="<name>"` per invocation
+  (subscription omits; ✅ live-verified the override is honored via a
+  bogus-name probe); aider → env only; swival → native names to
+  `--provider`, non-native+base_url to `--provider generic
+  --base-url`, Extra keys winning for back-compat. CLI: `-provider`
+  flag; `-list` now shows each client's provider catalog. App.Run
+  passes no provider until the Step 29 pickers. ✅ Live end to end
+  with the real keyring: secret-tool → OPENROUTER_API_KEY → aider →
+  OpenRouter authenticated (free models upstream-rate-limited; 429
+  with account identity proves the auth path; bad keys 401). Tests:
+  Prepare resolution matrix (secret injection/failure, unknown names,
+  client restrictions, codex catalog from a config.toml fixture),
+  providerEnv, codex/swival buildArgs incl. precedence rules.
 
 - [ ] **Step 29 — Cascading pickers: Provider → Model → Effort.**
   Client picker stays first; choosing a client populates its Provider

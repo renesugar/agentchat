@@ -90,11 +90,15 @@ func buildArgs(req adapter.TurnRequest, reportPath string) []string {
 	if v := req.Extra["profile"]; v != "" {
 		args = append(args, "--profile", v)
 	}
-	if v := req.Extra["provider"]; v != "" {
-		args = append(args, "--provider", v)
+	prov, baseURL := req.Extra["provider"], req.Extra["base_url"]
+	if prov == "" && baseURL == "" {
+		prov, baseURL = providerFlags(req.Provider)
 	}
-	if v := req.Extra["base_url"]; v != "" {
-		args = append(args, "--base-url", v)
+	if prov != "" {
+		args = append(args, "--provider", prov)
+	}
+	if baseURL != "" {
+		args = append(args, "--base-url", baseURL)
 	}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
@@ -115,6 +119,32 @@ func buildArgs(req adapter.TurnRequest, reportPath string) []string {
 		args = append(args, "--system-prompt", req.SystemPrompt)
 	}
 	return append(args, "--report", reportPath)
+}
+
+// nativeProviders are the --provider values swival 1.0.25 accepts.
+var nativeProviders = map[string]bool{
+	"lmstudio": true, "llamacpp": true, "huggingface": true,
+	"openrouter": true, "generic": true, "google": true, "geap": true,
+	"vertexai": true, "chatgpt": true, "bedrock": true, "command": true,
+}
+
+// providerFlags maps a resolved TurnRequest.Provider to swival's
+// --provider/--base-url pair: native names pass through; anything else
+// with a base URL becomes an OpenAI-compatible "generic" endpoint;
+// Extra["provider"]/["base_url"] take precedence in buildArgs
+// (back-compat with pre-Step-28 configs).
+func providerFlags(p *adapter.ProviderInfo) (prov, baseURL string) {
+	if p == nil || p.Subscription || p.Name == "" {
+		return "", ""
+	}
+	if nativeProviders[p.Name] {
+		return p.Name, p.BaseURL
+	}
+	if p.BaseURL != "" {
+		return "generic", p.BaseURL
+	}
+	// Unknown name, no URL: pass through and let swival reject it loudly.
+	return p.Name, ""
 }
 
 // RunTurn implements adapter.Adapter.

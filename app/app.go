@@ -499,7 +499,11 @@ func (a *App) Run(convID, client, model, effort, prompt string) (*transcript.Tur
 		Effort:    effort,
 		SessionID: sessionID,
 	}
-	a.set.Prepare(client, &req)
+	// Provider selection reaches the GUI with the Step 29 pickers; until
+	// then turns run on the client default (subscription/inherited env).
+	if err := a.set.Prepare(a.ctx, client, &req); err != nil {
+		return nil, err
+	}
 
 	turn, runErr := a.eng.RunTurn(a.ctx, convID, client, ws, req, tap)
 	if turn == nil && runErr != nil {

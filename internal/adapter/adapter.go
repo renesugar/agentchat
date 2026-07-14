@@ -57,6 +57,24 @@ type TurnRequest struct {
 	// Adapters for clients without MCP support ignore it; output capture
 	// remains the baseline transport either way.
 	MCP *MCPServerInfo
+	// Provider selects how the client reaches models this turn. Callers
+	// set Name; the clients layer resolves it (fills BaseURL and
+	// Subscription, appends the provider's env — API keys included — to
+	// Env). nil or a subscription entry means the client's own default
+	// auth, and adapters inject nothing.
+	Provider *ProviderInfo
+}
+
+// ProviderInfo identifies the model provider for one turn. API keys are
+// never carried here — they travel through TurnRequest.Env, resolved
+// from the platform secret store by the clients layer.
+type ProviderInfo struct {
+	// Name as configured (config.json providers / codex model_providers).
+	Name string
+	// BaseURL of the provider's endpoint, when known ("" otherwise).
+	BaseURL string
+	// Subscription marks the client's own default auth: inject nothing.
+	Subscription bool
 }
 
 // MCPServerInfo describes the app's per-turn MCP callback endpoint

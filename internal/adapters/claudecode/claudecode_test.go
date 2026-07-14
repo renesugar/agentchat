@@ -209,6 +209,33 @@ func TestBuildArgsMCP(t *testing.T) {
 	}
 }
 
+func TestProviderEnv(t *testing.T) {
+	// Subscription / nil / no URL: inject nothing — claude's own login.
+	for _, req := range []adapter.TurnRequest{
+		{},
+		{Provider: &adapter.ProviderInfo{Name: "", Subscription: true}},
+		{Provider: &adapter.ProviderInfo{Name: "x"}},
+	} {
+		if env := providerEnv(req); env != nil {
+			t.Errorf("providerEnv(%+v) = %v, want nil", req.Provider, env)
+		}
+	}
+
+	// API provider: base URL injected from the provider info.
+	req := adapter.TurnRequest{Provider: &adapter.ProviderInfo{
+		Name: "openrouter", BaseURL: "https://openrouter.ai/api"}}
+	if env := providerEnv(req); !reflect.DeepEqual(env, []string{"ANTHROPIC_BASE_URL=https://openrouter.ai/api"}) {
+		t.Errorf("providerEnv = %v", env)
+	}
+
+	// An explicit ANTHROPIC_BASE_URL in the provider's env map wins —
+	// nothing is injected on top of it.
+	req.Env = []string{"ANTHROPIC_BASE_URL=http://elsewhere"}
+	if env := providerEnv(req); env != nil {
+		t.Errorf("explicit base URL overridden: %v", env)
+	}
+}
+
 func TestFileChangeFromTool(t *testing.T) {
 	cases := []struct {
 		tool, input string

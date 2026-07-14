@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/example/agentchat/internal/adapter"
@@ -119,13 +120,35 @@ func buildArgs(req adapter.TurnRequest) []string {
 	return append(args, "--", req.Prompt)
 }
 
+// providerEnv maps a resolved API provider to claude's environment:
+// ANTHROPIC_BASE_URL from the provider's base URL. The key itself
+// arrives via req.Env (the provider's api_key_env — ANTHROPIC_API_KEY,
+// or ANTHROPIC_AUTH_TOKEN plus an explicit empty ANTHROPIC_API_KEY for
+// OpenRouter's Anthropic-protocol endpoint; both expressible in
+// config.json env maps). Explicit req.Env entries win: the child
+// process resolves duplicate variables to the LAST occurrence, so the
+// base URL is only injected when req.Env doesn't already set it.
+// Subscription (the default) injects nothing — claude uses its login.
+func providerEnv(req adapter.TurnRequest) []string {
+	p := req.Provider
+	if p == nil || p.Subscription || p.BaseURL == "" {
+		return nil
+	}
+	for _, e := range req.Env {
+		if strings.HasPrefix(e, "ANTHROPIC_BASE_URL=") {
+			return nil
+		}
+	}
+	return []string{"ANTHROPIC_BASE_URL=" + p.BaseURL}
+}
+
 // RunTurn implements adapter.Adapter.
 func (a *Adapter) RunTurn(ctx context.Context, req adapter.TurnRequest, emit adapter.EmitFunc) (*adapter.Result, error) {
 	start := time.Now()
 
 	cmd := exec.CommandContext(ctx, a.Binary, buildArgs(req)...)
 	cmd.Dir = req.WorkDir
-	cmd.Env = append(append(os.Environ(), req.Env...), req.MCPEnv()...)
+	cmd.Env = append(append(append(os.Environ(), req.Env...), providerEnv(req)...), req.MCPEnv()...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

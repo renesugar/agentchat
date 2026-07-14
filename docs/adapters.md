@@ -32,6 +32,35 @@ verified against their installed versions (see each section), and
 config.json can append or replace both lists (`clients.<name>.models` /
 `replace_models`, `clients.<name>.efforts` / `replace_efforts`).
 
+Providers (Steps 27-28): every client's catalog starts with its builtin
+default — claude/codex the user's subscription (inject NOTHING),
+aider/swival the inherited environment — plus config.json providers;
+API keys resolve from the platform secret store per turn (see
+ARCHITECTURE.md). Per-client wiring, verified 2026-07-14:
+- claude → env only: ANTHROPIC_BASE_URL from the provider's base_url
+  (an explicit env-map entry wins), the key via api_key_env
+  (ANTHROPIC_API_KEY, or ANTHROPIC_AUTH_TOKEN plus an explicit empty
+  ANTHROPIC_API_KEY for OpenRouter's Anthropic-protocol endpoint —
+  express both in the provider's env map). Not yet verified against a
+  live Anthropic-protocol proxy.
+- codex → `-c model_provider="<name>"` per invocation, selecting among
+  providers DECLARED in ~/.codex/config.toml (read-only; catalog =
+  subscription + those, overlaid with same-named config.json entries).
+  ✅ verified live: a bogus name fails with "Model provider `nope_xyz`
+  not found", proving the per-invocation override is honored;
+  subscription omits the flag entirely.
+- aider → env only (api_key_env + env map); pick openrouter/... model
+  slugs via the provider's models list. ✅ verified live end to end:
+  the key came out of the Ubuntu keyring via secret-tool, was injected
+  as OPENROUTER_API_KEY, and aider reached OpenRouter AUTHENTICATED
+  (free models were upstream-rate-limited that day — 429 carrying the
+  account identity, i.e. auth succeeded; a bad key yields 401).
+- swival → native provider names pass to `--provider` verbatim
+  (lmstudio|llamacpp|huggingface|openrouter|generic|google|geap|
+  vertexai|chatgpt|bedrock|command); a non-native name with a base_url
+  becomes `--provider generic --base-url <url>`;
+  Extra["provider"]/["base_url"] still win for back-compat.
+
 Record here the *verified* non-interactive invocation for each client, with
 the client version you verified it against. Planned invocations (unverified)
 are marked ⚠ — verify with `<client> --help` before implementing the adapter

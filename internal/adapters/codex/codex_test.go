@@ -183,6 +183,26 @@ func TestBuildArgsMCP(t *testing.T) {
 	}
 }
 
+func TestBuildArgsProvider(t *testing.T) {
+	got := buildArgs(adapter.TurnRequest{Prompt: "go",
+		Provider: &adapter.ProviderInfo{Name: "openrouter", BaseURL: "https://openrouter.ai/api/v1"}})
+	want := []string{"exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check",
+		"-c", `model_provider="openrouter"`, "-"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("provider args:\n got %v\nwant %v", got, want)
+	}
+
+	// Subscription (or nil): no provider override — codex's own login.
+	for _, p := range []*adapter.ProviderInfo{nil, {Name: "", Subscription: true}} {
+		got := buildArgs(adapter.TurnRequest{Prompt: "go", Provider: p})
+		for _, a := range got {
+			if strings.Contains(a, "model_provider") {
+				t.Errorf("provider %+v leaked into argv: %v", p, got)
+			}
+		}
+	}
+}
+
 func TestBuildArgsSystemPrompt(t *testing.T) {
 	got := buildArgs(adapter.TurnRequest{Prompt: "go", SystemPrompt: "line one\nline \"two\""})
 	want := []string{"exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check",

@@ -47,6 +47,7 @@ func run() error {
 		dir       = flag.String("dir", ".", "workspace directory")
 		model     = flag.String("model", "", "model ID (adapter default if empty)")
 		effort    = flag.String("effort", "", "reasoning effort level (client default if empty; client validates values)")
+		provName  = flag.String("provider", "", "model provider name (client default/subscription if empty; see -list)")
 		session   = flag.String("resume", "", "session ID from a previous turn")
 		convID    = flag.String("conv", "", "conversation ID to continue (new one if empty)")
 		title     = flag.String("title", "", "title for a new conversation")
@@ -317,7 +318,12 @@ func run() error {
 		Effort:    *effort,
 		SessionID: *session,
 	}
-	set.Prepare(*client, &req)
+	if *provName != "" {
+		req.Provider = &adapter.ProviderInfo{Name: *provName}
+	}
+	if err := set.Prepare(ctx, *client, &req); err != nil {
+		return err
+	}
 
 	eng := engine.New(set.Registry, store)
 	if *useMCP {
@@ -391,8 +397,20 @@ func listAdapters(ctx context.Context, set *clients.Set) error {
 		if err != nil {
 			return fmt.Errorf("%s: listing efforts: %w", name, err)
 		}
-		fmt.Printf("%s\t%s\tmodels: %s\tefforts: %s\n",
-			name, status, strings.Join(ids, ", "), strings.Join(efforts, ", "))
+		provs, err := set.Providers(ctx, name)
+		if err != nil {
+			return fmt.Errorf("%s: listing providers: %w", name, err)
+		}
+		pnames := make([]string, len(provs))
+		for i, p := range provs {
+			if p.Name == "" {
+				pnames[i] = "(" + p.Label + ")"
+			} else {
+				pnames[i] = p.Name
+			}
+		}
+		fmt.Printf("%s\t%s\tproviders: %s\tmodels: %s\tefforts: %s\n",
+			name, status, strings.Join(pnames, ", "), strings.Join(ids, ", "), strings.Join(efforts, ", "))
 	}
 	return nil
 }
