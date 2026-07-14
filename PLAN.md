@@ -491,33 +491,36 @@ in a compiling state**.
   Tests: buildArgs per adapter, tomlQuote table, MCPEnv, engine round
   trip asserting fragment contents + no token leak + suppression.
 
-- [ ] **Step 27 — Provider model (core) + platform secrets.** A Provider
-  is a named way to reach models for a client; per client the picker
-  offers at least "subscription/default" plus configured providers.
-  - `internal/provider`: types + resolution. Sources: (a) config.json
-    providers (existing env maps, extended with optional base_url,
-    api_key_secret); (b) codex: READ-ONLY parse of ~/.codex/config.toml
-    `[model_providers.*]` → name, base_url, env_key (plus implicit
-    "subscription" default; NEVER write that file — Step 18 red line);
-    (c) claude: "subscription" (default, injects nothing) vs "api"
-    (ANTHROPIC_BASE_URL + ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN);
-    (d) aider/swival: providers named in config (openrouter, localai…)
-    mapping to their env conventions (OPENROUTER_API_KEY etc.) and,
-    for swival, --provider/--base-url flags.
-  - Secrets: key VALUES come from the platform secret store at turn
-    time, never stored in the clear and never in argv. Linux:
-    `secret-tool lookup <attr>=<val>...` (config carries only the
-    lookup attributes); design leaves room for macOS `security` /
-    Windows credman later. Config gets e.g.
-    `providers.<name>.api_key_secret = {"provider":"openrouter",
-    "token_type":"api_key"}`; resolution shells out, trims, injects as
-    the provider's env_key. Missing tool/entry = loud per-turn error.
-  - TOML parsing for codex config: stdlib-only minimal parser for the
-    needed subset (tables + string keys) or a tiny vendored decoder —
-    note the dependency decision in ARCHITECTURE.md if one is added.
-  - Tests: codex TOML fixture parse; provider resolution precedence;
-    secret lookup via a stub secret-tool on PATH; subscription
-    providers inject nothing.
+- [x] **Step 27 — Provider model (core) + platform secrets.**
+  `internal/provider` (stdlib-only): `Def` (Name "" = client default,
+  mirroring model ID ""), `Default(client)` builtin entry (claude/codex
+  "Subscription (default)" — injects nothing; others "Default
+  (inherited environment)"), `Catalog(client, configDefs, codexDefs)` —
+  builtin first; for codex only codex-declared providers are usable,
+  with same-named config.json entries overlaid (key secrets, models,
+  labels) and config-only names dropped; other clients get config defs
+  as-is. `ReadCodexConfig` parses ~/.codex/config.toml READ-ONLY with a
+  minimal line-based TOML-subset reader (tables, basic/literal strings,
+  escapes; multiline strings consumed, arrays/inline tables skipped —
+  no dependency added; codex validates its own config) extracting
+  model_providers.* name/base_url/env_key plus top-level
+  model_provider/model; $CODEX_HOME honored; verified against the real
+  ~/.codex/config.toml (openai / gpt-5.6-sol, 0 custom providers).
+  Secrets: config providers gain label/base_url/api_key_env/
+  api_key_secret/clients/models (api_key_secret without api_key_env is
+  a loud config error); `Def.ResolveEnv(ctx, store)` returns sorted
+  ${VAR}-expanded env plus EnvKey=<secret> fetched per turn through the
+  SecretStore interface — PlatformStore() is secret-tool on Linux
+  (attrs sorted deterministically; missing tool/entry/empty = loud
+  error; value only ever in the pipe, never argv/disk), a
+  clearly-labeled unsupported stub elsewhere. secret-tool + the
+  keyring's openrouter entry verified present on this machine (length
+  only). Config.ProviderDefs(client) honors per-provider client
+  restrictions. Tests: catalog merge/drop rules, ResolveEnv matrix,
+  real exec path via stub secret-tool on PATH, codex TOML fixture
+  (quoted table keys, comments, multiline, inline tables), value
+  parser table, config field parsing/validation. Supersedes Step 22.
+  Adapter/engine wiring is Step 28; pickers Step 29.
 
 - [ ] **Step 28 — Adapter provider wiring.** `TurnRequest.Provider`
   (name) resolved by the engine/clients layer into env + flags:

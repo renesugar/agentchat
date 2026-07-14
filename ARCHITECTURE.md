@@ -101,12 +101,24 @@ point of the app.
    frontend, and is deliberately outside the root module so `make check`
    never needs the Wails dependency.
 
-9. **LocalAI's role.** LocalAI (and any OpenAI-compatible server) is a
-   *model provider that coding clients point at* via base-URL config — it
-   is not UI scaffolding for this app. Configure it as a provider env set
-   in config.json (see docs/config.example.json); each client reads its
-   own variables, so provider entries are explicit env maps rather than a
-   magic base_url the app would have to translate per client.
+9. **Providers & secrets.** A provider (`internal/provider`, Step 27) is
+   a named way for a client to reach models. Every client's catalog
+   starts with a builtin default — claude/codex: the user's own
+   subscription (inject nothing); aider/swival: the inherited
+   environment — followed by config.json providers (explicit env maps,
+   optionally base_url + api_key_env). For codex, the usable providers
+   are the ones declared in ~/.codex/config.toml `[model_providers.*]`,
+   parsed READ-ONLY with a minimal stdlib line-based TOML-subset reader
+   (no dependency added; codex validates its own config — our reader
+   only extracts name/base_url/env_key and skips the rest); same-named
+   config.json entries overlay them (key secrets, models, labels).
+   API-key VALUES never live in config files, argv, or transcripts:
+   config carries only platform secret-store *lookup attributes*
+   (Linux: secret-tool; other OS backends are future work) and
+   Def.ResolveEnv fetches the value per turn, injecting it as the
+   provider's env key. LocalAI or any OpenAI-compatible server is just
+   such a provider entry — each client reads its own variables, so env
+   maps stay explicit rather than a magic base_url the app translates.
 
 10. **Dependencies.** Core stays stdlib-only as long as practical; `git`
     is used by shelling out (no cgo/go-git). Wails and any DB driver enter
@@ -130,6 +142,8 @@ internal/artifact/     Step 8: artifact library
 internal/mcpserver/    Steps 12+25: loopback MCP/REST callback server
                        (progress, artifacts, conversation context)
 internal/theme/        Step 21: UI color themes (built-in + user JSON files)
+internal/provider/     Step 27: provider catalogs (config + read-only codex
+                       config.toml) and platform secret-store key resolution
 app/                   Wails desktop app — NESTED module (own go.mod with a
                        replace to the core) so the root stays dependency-free;
                        vanilla JS frontend embedded from app/frontend/dist

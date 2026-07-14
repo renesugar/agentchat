@@ -37,15 +37,37 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 
 	"github.com/example/agentchat/internal/adapter"
+	"github.com/example/agentchat/internal/provider"
 )
 
-// Provider is a named set of environment variables handed to client
-// processes (values expanded with ${VAR} against the process env).
+// Provider is a named way to reach models: a set of environment
+// variables handed to client processes (values expanded with ${VAR}
+// against the process env), optionally an endpoint plus an API key
+// sourced from the platform secret store at turn time (Step 27) — key
+// VALUES never live in this file.
 type Provider struct {
 	Env map[string]string `json:"env,omitempty"`
+	// Label is the human-readable picker text; defaults to the name.
+	Label string `json:"label,omitempty"`
+	// BaseURL is the API endpoint, for clients that take one (swival
+	// --base-url; claude ANTHROPIC_BASE_URL; codex reads its own config).
+	BaseURL string `json:"base_url,omitempty"`
+	// APIKeyEnv names the environment variable the client reads the API
+	// key from (e.g. OPENROUTER_API_KEY, ANTHROPIC_API_KEY).
+	APIKeyEnv string `json:"api_key_env,omitempty"`
+	// APIKeySecret holds the platform secret-store lookup attributes for
+	// the key's value (Linux: `secret-tool lookup k1 v1 k2 v2...`).
+	// Requires APIKeyEnv. The value is fetched per turn, never stored.
+	APIKeySecret map[string]string `json:"api_key_secret,omitempty"`
+	// Clients restricts which coding clients offer this provider in
+	// their pickers; empty = all clients.
+	Clients []string `json:"clients,omitempty"`
+	// Models offered by this provider (for the cascading pickers).
+	Models []adapter.Model `json:"models,omitempty"`
 }
 
 // Client holds per-adapter overrides.
@@ -111,7 +133,45 @@ func (c *Config) validate() error {
 			return fmt.Errorf("client %q references unknown provider %q", name, cl.Provider)
 		}
 	}
+	for name, p := range c.Providers {
+		if len(p.APIKeySecret) > 0 && p.APIKeyEnv == "" {
+			return fmt.Errorf("provider %q sets api_key_secret without api_key_env (which variable should receive the key?)", name)
+		}
+	}
 	return nil
+}
+
+// ProviderDefs converts the configured providers into provider.Def
+// values for a client's catalog, honoring each provider's Clients
+// restriction. Sorted by name for stable pickers.
+func (c *Config) ProviderDefs(client string) []provider.Def {
+	names := make([]string, 0, len(c.Providers))
+	for name := range c.Providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var out []provider.Def
+	for _, name := range names {
+		p := c.Providers[name]
+		if len(p.Clients) > 0 && !slices.Contains(p.Clients, client) {
+			continue
+		}
+		label := p.Label
+		if label == "" {
+			label = name
+		}
+		out = append(out, provider.Def{
+			Name:      name,
+			Label:     label,
+			Source:    "config",
+			BaseURL:   p.BaseURL,
+			EnvKey:    p.APIKeyEnv,
+			KeySecret: p.APIKeySecret,
+			Env:       p.Env,
+			Models:    p.Models,
+		})
+	}
+	return out
 }
 
 // Binary returns the configured binary override for a client ("" = none).

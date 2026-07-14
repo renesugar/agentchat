@@ -20,6 +20,14 @@ const sample = `{
         "OPENAI_API_BASE": "http://localhost:8080/v1",
         "OPENAI_API_KEY": "${TEST_LOCALAI_KEY}"
       }
+    },
+    "openrouter": {
+      "label": "OpenRouter (keyring)",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "api_key_secret": { "provider": "openrouter", "token_type": "api_key" },
+      "clients": [ "aider", "swival", "codex" ],
+      "models": [ { "id": "qwen/qwen3-coder:free", "label": "Qwen3 Coder (free)" } ]
     }
   },
   "clients": {
@@ -161,6 +169,38 @@ func TestModelsMerging(t *testing.T) {
 	// Unconfigured client: built-ins untouched.
 	if got := c.Models("codex", builtin); !reflect.DeepEqual(got, builtin) {
 		t.Errorf("codex models = %v", got)
+	}
+}
+
+func TestProviderDefs(t *testing.T) {
+	c, err := config.Load(writeConfig(t, sample))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// aider sees both providers (localai unrestricted, openrouter listed).
+	defs := c.ProviderDefs("aider")
+	if len(defs) != 2 || defs[0].Name != "localai" || defs[1].Name != "openrouter" {
+		t.Fatalf("aider defs = %+v", defs)
+	}
+	or := defs[1]
+	if or.Label != "OpenRouter (keyring)" || or.Source != "config" ||
+		or.BaseURL != "https://openrouter.ai/api/v1" || or.EnvKey != "OPENROUTER_API_KEY" ||
+		or.KeySecret["token_type"] != "api_key" ||
+		len(or.Models) != 1 || or.Models[0].ID != "qwen/qwen3-coder:free" {
+		t.Errorf("openrouter def = %+v", or)
+	}
+
+	// claude is not in openrouter's clients list.
+	defs = c.ProviderDefs("claude")
+	if len(defs) != 1 || defs[0].Name != "localai" {
+		t.Errorf("claude defs = %+v", defs)
+	}
+
+	// api_key_secret without api_key_env is a loud config error.
+	bad := `{"providers": {"x": {"api_key_secret": {"a": "b"}}}}`
+	if _, err := config.Load(writeConfig(t, bad)); err == nil || !strings.Contains(err.Error(), "api_key_env") {
+		t.Errorf("missing api_key_env err = %v", err)
 	}
 }
 
