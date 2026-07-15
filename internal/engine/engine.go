@@ -75,9 +75,14 @@ func (e *Engine) RunTurn(ctx context.Context, convID, client string, ws *workspa
 		prevSnap = ws.LatestSnapshot(ctx)
 	}
 
+	provName := ""
+	if req.Provider != nil {
+		provName = req.Provider.Name
+	}
 	turn, err := e.Store.BeginTurn(ctx, convID, transcript.NewTurn{
 		Client:       client,
 		Model:        req.Model,
+		Provider:     provName,
 		Effort:       req.Effort,
 		WorkspaceRef: req.WorkDir,
 		Prompt:       req.Prompt,

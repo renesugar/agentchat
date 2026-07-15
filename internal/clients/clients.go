@@ -90,6 +90,31 @@ func (s *Set) Providers(ctx context.Context, client string) ([]provider.Def, err
 	return provider.Catalog(client, s.Config.ProviderDefs(client), codexDefs), nil
 }
 
+// ProvidersWithModels returns a client's provider catalog with each
+// entry's model picker filled in, so a UI can cascade client → provider
+// → model without extra round trips: a provider's own models (config /
+// codex defaults) get a leading client-default entry; providers without
+// models fall back to the client's merged list.
+func (s *Set) ProvidersWithModels(ctx context.Context, client string) ([]provider.Def, error) {
+	defs, err := s.Providers(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	clientModels, err := s.Models(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	for i, d := range defs {
+		switch {
+		case len(d.Models) == 0:
+			defs[i].Models = clientModels
+		case d.Models[0].ID != "":
+			defs[i].Models = append([]adapter.Model{{ID: "", Label: "Default (client-configured)"}}, d.Models...)
+		}
+	}
+	return defs, nil
+}
+
 // Models returns a client's model picker entries: the adapter's built-in
 // list merged with configured additions (see config.Config.Models).
 func (s *Set) Models(ctx context.Context, client string) ([]adapter.Model, error) {

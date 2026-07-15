@@ -14,7 +14,11 @@
       "api_key_secret": { "provider": "openrouter", "token_type": "api_key" },
       "env": {
         "OPENAI_API_BASE": "https://openrouter.ai/api/v1"
-      }
+      },
+      "models": [
+        { "id": "openrouter/qwen/qwen3-coder:free", "label": "Qwen3 Coder (free, aider slug)" },
+        { "id": "anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet (swival/codex slug)" }
+      ]
     }
   },
   "clients": {

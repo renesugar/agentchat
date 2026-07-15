@@ -128,6 +128,7 @@ func (s *FSStore) BeginTurn(ctx context.Context, convID string, nt NewTurn) (*Tu
 		Seq:            seq,
 		Client:         nt.Client,
 		Model:          nt.Model,
+		Provider:       nt.Provider,
 		Effort:         nt.Effort,
 		WorkspaceRef:   nt.WorkspaceRef,
 		Prompt:         nt.Prompt,

@@ -353,6 +353,21 @@ func TestPrepareResolvesProvider(t *testing.T) {
 		t.Error("clients restriction not honored")
 	}
 
+	// ProvidersWithModels: the default provider carries the client's
+	// merged model list; a provider with its own models gets a leading
+	// client-default entry.
+	pm, err := set.ProvidersWithModels(ctx, "aider")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pm) != 3 || len(pm[0].Models) == 0 || pm[0].Models[0].ID != "" {
+		t.Fatalf("default provider models = %+v", pm[0].Models)
+	}
+	orModels := pm[2].Models // openrouter (localai is pm[1])
+	if pm[2].Name != "openrouter" || len(orModels) != 2 || orModels[0].ID != "" || orModels[1].ID != "qwen/qwen3-coder:free" {
+		t.Fatalf("openrouter models = %+v", orModels)
+	}
+
 	// codex catalogs come from its own config file (read-only).
 	codexToml := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(codexToml, []byte("[model_providers.openrouter]\nname = \"OpenRouter\"\nbase_url = \"https://openrouter.ai/api/v1\"\nenv_key = \"OPENROUTER_API_KEY\"\n"), 0o644); err != nil {

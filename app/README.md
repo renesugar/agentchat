@@ -41,10 +41,12 @@ Go 1.26.
 - `Conversations()`, `Turns(conv)`, `Events(conv, turn)` — transcript reads
 - `CreateConversation(title, repoPath)` — repoPath "" → managed scratch
   workspace; a git repo path → snapshot-managed repo workspace
-- `Run(conv, client, model, effort, prompt)` — executes a turn (effort ""
-  = client default); every normalized event is also pushed to the
-  frontend as the Wails event `turn-event` with payload
-  `{conversationId, event}`
+- `Run(conv, client, provider, model, effort, prompt)` — executes a
+  turn (provider/effort "" = client default); every normalized event is
+  also pushed to the frontend as the Wails event `turn-event` with
+  payload `{conversationId, event}`. `Adapters()` carries each client's
+  provider catalog with per-provider model lists, so the composer
+  cascades client → provider → model → effort without round trips.
 - `ExportMarkdown(conv)` / `ExportBundle(conv)` — save-dialog exports
 - `TurnMarkdown(conv, turn)` — one turn's markdown section (per-turn
   copy button in the transcript)

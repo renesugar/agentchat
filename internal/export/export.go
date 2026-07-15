@@ -103,6 +103,9 @@ func TurnMarkdown(t *transcript.Turn, events []adapter.Event) []byte {
 	if t.Effort != "" {
 		model += ", effort " + t.Effort
 	}
+	if t.Provider != "" {
+		model += ", via " + t.Provider
+	}
 	fmt.Fprintf(&b, "## Turn %d — %s (%s) — %s\n\n", t.Seq, t.Client, model, t.Status)
 
 	b.WriteString("**Prompt:**\n\n")

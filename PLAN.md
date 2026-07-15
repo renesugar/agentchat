@@ -544,15 +544,23 @@ in a compiling state**.
   client restrictions, codex catalog from a config.toml fixture),
   providerEnv, codex/swival buildArgs incl. precedence rules.
 
-- [ ] **Step 29 — Cascading pickers: Provider → Model → Effort.**
-  Client picker stays first; choosing a client populates its Provider
-  dropdown (ProviderLister capability + config merge), choosing a
-  provider populates Models (per-provider model lists from config;
-  codex providers may also carry a default model from config.toml),
-  and Model populates Effort (existing efforts, possibly filtered per
-  provider later). AdapterInfo grows a providers[] tree so the
-  frontend cascades without extra round trips. Config example +
-  docs; GUI verified via the Step 23/24 harness.
+- [x] **Step 29 — Cascading pickers: Provider → Model → Effort.**
+  `Set.ProvidersWithModels` fills each catalog entry's model list (a
+  provider's own models get a leading client-default entry; providers
+  without models fall back to the client's merged list) so
+  AdapterInfo.Providers carries the whole tree and the frontend
+  cascades client → provider → model → effort with no round trips.
+  Composer gains the Provider select (labels; "" = subscription/
+  default); client change repopulates providers, provider change
+  repopulates models, picks survive when still offered. App.Run gains
+  the provider param; the selected provider is recorded on the turn
+  (transcript.Turn.Provider, mirroring effort) and shown as "via
+  <name>" in the GUI turn header, optimistic header, and TurnMarkdown
+  ("client (model, effort X, via Y)" — golden updated). Tests:
+  ProvidersWithModels fallback/prepend rules, engine provider
+  persistence. GUI verified via the harness under openbox+xcompmgr:
+  four-select composer renders and focuses; dropdown POPUP contents
+  remain the Step 24 item.
 
 - [ ] **Step 30 — Composer redesign (per agentchat_lighttheme_new.png).**
   One rounded input bubble containing: the prompt textarea (grows to a

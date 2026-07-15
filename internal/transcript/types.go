@@ -44,6 +44,7 @@ type Turn struct {
 	Seq            int        `json:"seq"` // 1-based position within the conversation
 	Client         string     `json:"client"`
 	Model          string     `json:"model,omitempty"`
+	Provider       string     `json:"provider,omitempty"`      // model provider, when one was selected
 	Effort         string     `json:"effort,omitempty"`        // reasoning effort, when one was set
 	WorkspaceRef   string     `json:"workspace_ref,omitempty"` // dir/worktree/snapshot id (Step 7 refines)
 	Prompt         string     `json:"prompt"`
@@ -66,6 +67,7 @@ type Turn struct {
 type NewTurn struct {
 	Client       string
 	Model        string
+	Provider     string
 	Effort       string
 	WorkspaceRef string
 	Prompt       string

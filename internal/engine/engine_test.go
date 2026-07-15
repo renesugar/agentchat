@@ -59,7 +59,10 @@ func TestRunTurnSnapshotsWorkspace(t *testing.T) {
 	conv, _ := store.CreateConversation(ctx, transcript.NewConversation{Title: "ws"})
 
 	// Turn 1 (echo): snapshot recorded; adapter-reported changes kept.
-	t1, err := eng.RunTurn(ctx, conv.ID, "echo", ws, adapter.TurnRequest{Prompt: "one", Effort: "high"}, nil)
+	t1, err := eng.RunTurn(ctx, conv.ID, "echo", ws, adapter.TurnRequest{
+		Prompt: "one", Effort: "high",
+		Provider: &adapter.ProviderInfo{Name: "openrouter"},
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,6 +76,9 @@ func TestRunTurnSnapshotsWorkspace(t *testing.T) {
 	// it into ECHO.md), proving the end-to-end plumbing.
 	if t1.Effort != "high" {
 		t.Fatalf("turn 1 Effort = %q, want %q", t1.Effort, "high")
+	}
+	if t1.Provider != "openrouter" {
+		t.Fatalf("turn 1 Provider = %q, want openrouter", t1.Provider)
 	}
 	if b, err := os.ReadFile(filepath.Join(ws.Dir, "ECHO.md")); err != nil {
 		t.Fatal(err)

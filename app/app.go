@@ -22,6 +22,7 @@ import (
 	"github.com/example/agentchat/internal/engine"
 	"github.com/example/agentchat/internal/export"
 	"github.com/example/agentchat/internal/mcpserver"
+	"github.com/example/agentchat/internal/provider"
 	"github.com/example/agentchat/internal/theme"
 	"github.com/example/agentchat/internal/transcript"
 	"github.com/example/agentchat/internal/workspace"
@@ -179,6 +180,10 @@ type AdapterInfo struct {
 	// (adapter capability merged with config); empty when the client
 	// has none. "" (client default) is implied.
 	Efforts []string `json:"efforts,omitempty"`
+	// Providers is the client's provider catalog (builtin default
+	// first), each with its model list, so the frontend cascades
+	// client -> provider -> model -> effort without round trips.
+	Providers []provider.Def `json:"providers,omitempty"`
 }
 
 // Adapters lists registered coding clients with availability and models.
@@ -199,6 +204,9 @@ func (a *App) Adapters() ([]AdapterInfo, error) {
 		}
 		if efforts, err := a.set.Efforts(a.ctx, name); err == nil {
 			info.Efforts = efforts
+		}
+		if provs, err := a.set.ProvidersWithModels(a.ctx, name); err == nil {
+			info.Providers = provs
 		}
 		out = append(out, info)
 	}
@@ -453,11 +461,11 @@ type turnEvent struct {
 }
 
 // Run executes one turn and streams its events to the frontend as the
-// Wails event "turn-event". effort "" means client default (a configured
-// default_effort may still apply). It returns the finished turn record; a
-// client failure is reported in Turn.Status/Error rather than as a hard
-// error, so the UI can render it in place.
-func (a *App) Run(convID, client, model, effort, prompt string) (*transcript.Turn, error) {
+// Wails event "turn-event". provider/effort "" mean client default. It
+// returns the finished turn record; a client failure is reported in
+// Turn.Status/Error rather than as a hard error, so the UI can render
+// it in place.
+func (a *App) Run(convID, client, providerName, model, effort, prompt string) (*transcript.Turn, error) {
 	a.mu.Lock()
 	if a.running[convID] {
 		a.mu.Unlock()
@@ -499,8 +507,9 @@ func (a *App) Run(convID, client, model, effort, prompt string) (*transcript.Tur
 		Effort:    effort,
 		SessionID: sessionID,
 	}
-	// Provider selection reaches the GUI with the Step 29 pickers; until
-	// then turns run on the client default (subscription/inherited env).
+	if providerName != "" {
+		req.Provider = &adapter.ProviderInfo{Name: providerName}
+	}
 	if err := a.set.Prepare(a.ctx, client, &req); err != nil {
 		return nil, err
 	}

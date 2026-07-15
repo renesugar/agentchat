@@ -7,7 +7,7 @@
 
 ---
 
-## Turn 1 — claude (sonnet, effort high) — done
+## Turn 1 — claude (sonnet, effort high, via openrouter) — done
 
 **Prompt:**
 

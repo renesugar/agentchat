@@ -87,7 +87,7 @@ async function loadAdapters() {
   }
   const firstOk = state.adapters.find((a) => a.available);
   if (firstOk) clientSel.value = firstOk.name;
-  refreshModels();
+  refreshProviders();
 
   const status = $("adapter-status");
   status.replaceChildren();
@@ -99,15 +99,40 @@ async function loadAdapters() {
   }
 }
 
+// currentProvider returns the selected provider entry of the selected
+// client (the builtin default when nothing else matches).
+function currentProvider() {
+  const info = state.adapters.find((a) => a.name === $("client").value);
+  const provs = info?.providers || [];
+  return provs.find((p) => p.name === $("provider").value) || provs[0];
+}
+
+// refreshProviders repopulates the provider select for the selected
+// client (keeping the pick when still offered), then cascades to models.
+function refreshProviders() {
+  const info = state.adapters.find((a) => a.name === $("client").value);
+  const sel = $("provider");
+  const prev = sel.value;
+  sel.replaceChildren();
+  for (const p of info?.providers || []) {
+    sel.append(new Option(p.name ? (p.label || p.name) : `Provider: ${p.label}`, p.name));
+  }
+  if (prev && (info?.providers || []).some((p) => p.name === prev)) sel.value = prev;
+  refreshModels();
+}
+
 function refreshModels() {
   const info = state.adapters.find((a) => a.name === $("client").value);
   const modelSel = $("model");
+  const prevModel = modelSel.value;
   modelSel.replaceChildren();
-  for (const m of info?.models || []) {
+  const models = currentProvider()?.models || info?.models || [];
+  for (const m of models) {
     const opt = el("option", "", m.label || m.id || "default");
     opt.value = m.id;
     modelSel.append(opt);
   }
+  if (prevModel && models.some((m) => m.id === prevModel)) modelSel.value = prevModel;
 
   // Effort levels are per client (adapter capability merged with the
   // user's config); keep the current pick when the new client offers it.
@@ -298,6 +323,7 @@ function turnHeader(turn) {
   who.append(el("span", "seq", `#${turn.seq}`));
   who.append(document.createTextNode(`▌${turn.client} `));
   who.append(el("span", "model", turn.model || "default model"));
+  if (turn.provider) who.append(el("span", "model", `via ${turn.provider}`));
   if (turn.effort) who.append(el("span", "model", `effort ${turn.effort}`));
   if (turn.status === "failed") who.append(el("span", "status-failed", "failed"));
 
@@ -441,6 +467,7 @@ async function runTurn(evSubmit) {
   if (!prompt) return;
 
   const client = $("client").value;
+  const providerName = $("provider").value;
   const model = $("model").value;
   const effort = $("effort").value;
   const convID = state.current.id;
@@ -456,6 +483,7 @@ async function runTurn(evSubmit) {
   const who = el("div", "who");
   who.append(document.createTextNode(`▌${client} `));
   who.append(el("span", "model", model || "default model"));
+  if (providerName) who.append(el("span", "model", `via ${providerName}`));
   if (effort) who.append(el("span", "model", `effort ${effort}`));
   wrap.append(who);
   wrap.append(el("div", "prompt", prompt));
@@ -468,7 +496,7 @@ async function runTurn(evSubmit) {
   state.liveTurnEl = body;
 
   try {
-    const turn = await api().Run(convID, client, model, effort, prompt);
+    const turn = await api().Run(convID, client, providerName, model, effort, prompt);
     // Replace the optimistic block with the authoritative record.
     const events = (await api().Events(convID, turn.id)) || [];
     wrap.replaceWith(renderTurn(turn, events));
@@ -734,7 +762,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  $("client").onchange = refreshModels;
+  $("client").onchange = refreshProviders;
+  $("provider").onchange = refreshModels;
   $("composer").onsubmit = runTurn;
   $("prompt").addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
