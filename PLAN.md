@@ -594,6 +594,22 @@ in a compiling state**.
   Credential Manager UI, then a provider turn; record versions in
   docs/adapters.md and flip this to [x].
 
+- [ ] **Step 33 — Publish to GitHub (github.com/renesugar/agentchat).**
+  The repo exists (public, empty) and `origin` is already configured;
+  gh is authenticated. In order:
+  1. Pre-publish secret audit: scan the full history for key material
+     (sk-or-/sk-ant-/token patterns) and stray local files — initial
+     scan clean; re-run as the last gate before push.
+  2. Rename the module to its real home per AGENTS.md rule 7:
+     `github.com/example/agentchat` → `github.com/renesugar/agentchat`
+     in root go.mod, app/go.mod (+ replace), and every import; update
+     AGENTS.md rule 7 itself; `make check` + `make app-build-check`.
+  3. LICENSE: none exists — publishing without one means all rights
+     reserved. USER DECISION: pick a license (MIT/Apache-2.0/none).
+  4. `git branch -M main` (already main) and `git push -u origin main`.
+  5. Verify: `gh repo view --web`-level sanity — README renders,
+     history intact, no unexpected files.
+
 ## Notes for the next implementing agent (handoff, 2026-07-11)
 
 State: steps 1-17 and 19-21, 23 are done and committed on main; `make
