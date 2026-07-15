@@ -54,6 +54,8 @@ Go 1.26.
   refused while a turn is running
 - `Projects()` — distinct projects derived from conversations
   ({path, label, count}); feeds the sidebar groups and creation picker
+- `GCArtifacts(remove)` — count/delete artifacts whose conversation
+  was deleted (Maintenance button in Settings; CLI: -gc-artifacts)
 - `PromoteConversation(conv)` — save-dialog: move the scratch workspace
   (snapshot chain intact) to a new directory and make it the project
 - `MoveConversation(conv, path)` — re-associate with a project repo

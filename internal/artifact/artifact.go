@@ -340,6 +340,26 @@ func (l *Library) RestoreRecord(ctx context.Context, raw []byte, blob io.Reader)
 	return &a, true, nil
 }
 
+// Orphans lists artifacts tied to conversations that no longer exist:
+// records whose non-empty ConversationID is rejected by exists. Records
+// with no conversation are global and never orphans. Deleting a
+// conversation deliberately keeps its artifacts (they may be shared or
+// exported); this is the deferred cleanup path — pair with Delete,
+// which garbage-collects CAS blobs when their last record goes.
+func (l *Library) Orphans(ctx context.Context, exists func(convID string) bool) ([]*Artifact, error) {
+	all, err := l.List(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	var out []*Artifact
+	for _, a := range all {
+		if a.ConversationID != "" && !exists(a.ConversationID) {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
 // Delete removes an artifact record. A file blob is garbage-collected when
 // no remaining record references its hash.
 func (l *Library) Delete(ctx context.Context, id string) error {

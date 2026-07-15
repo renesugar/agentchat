@@ -58,6 +58,7 @@ func run() error {
 		exportSeq = flag.Int("export-turn", 0, "print turn <seq> of -conv as markdown to stdout, then exit")
 		exportZip = flag.String("export-bundle", "", "write a ZIP bundle of -conv (transcript+artifacts[+workspace via -dir]) to this file, then exit")
 		importZip = flag.String("import-bundle", "", "restore a conversation from this bundle ZIP, then exit")
+		gcArts    = flag.String("gc-artifacts", "", `clean up artifacts of deleted conversations: "list" (dry run) or "delete", then exit`)
 		deleteID  = flag.String("delete-conv", "", "delete this conversation (turns+events; artifacts are kept), then exit")
 		setProj   = flag.String("set-project", "", "re-associate -conv with this project repo path (\"-\" detaches to scratch), then exit")
 		promote   = flag.String("promote", "", "move -conv's scratch workspace to this NEW directory and make it the project, then exit")
@@ -93,6 +94,42 @@ func run() error {
 		for _, c := range convs {
 			fmt.Printf("%s\t%s\t%s\t%s\n", c.ID, c.UpdatedAt.Format("2006-01-02 15:04"), c.Title, c.ProjectPath)
 		}
+		return nil
+	}
+
+	if *gcArts != "" {
+		if *gcArts != "list" && *gcArts != "delete" {
+			return fmt.Errorf(`-gc-artifacts takes "list" or "delete"`)
+		}
+		lib, err := artifact.NewLibrary(filepath.Join(store.Root(), "artifacts"))
+		if err != nil {
+			return err
+		}
+		convs, err := store.ListConversations(ctx)
+		if err != nil {
+			return err
+		}
+		ids := make(map[string]bool, len(convs))
+		for _, c := range convs {
+			ids[c.ID] = true
+		}
+		orphans, err := lib.Orphans(ctx, func(id string) bool { return ids[id] })
+		if err != nil {
+			return err
+		}
+		for _, a := range orphans {
+			if *gcArts == "delete" {
+				if err := lib.Delete(ctx, a.ID); err != nil {
+					return err
+				}
+			}
+			fmt.Printf("%s\t%s\t(conversation %s gone)\n", a.ID, a.Name, a.ConversationID)
+		}
+		verb := "orphaned artifact(s) found (dry run; use -gc-artifacts delete)"
+		if *gcArts == "delete" {
+			verb = "orphaned artifact(s) deleted"
+		}
+		fmt.Fprintf(os.Stderr, "%d %s\n", len(orphans), verb)
 		return nil
 	}
 

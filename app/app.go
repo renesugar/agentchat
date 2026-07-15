@@ -443,6 +443,31 @@ func (a *App) ImportBundle() (*transcript.Conversation, error) {
 	return conv, nil
 }
 
+// GCArtifacts counts artifacts whose conversation no longer exists and,
+// with remove=true, deletes them (CAS blobs GC with their last record).
+func (a *App) GCArtifacts(remove bool) (int, error) {
+	convs, err := a.store.ListConversations(a.ctx)
+	if err != nil {
+		return 0, err
+	}
+	ids := make(map[string]bool, len(convs))
+	for _, c := range convs {
+		ids[c.ID] = true
+	}
+	orphans, err := a.lib.Orphans(a.ctx, func(id string) bool { return ids[id] })
+	if err != nil {
+		return 0, err
+	}
+	if remove {
+		for _, o := range orphans {
+			if err := a.lib.Delete(a.ctx, o.ID); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(orphans), nil
+}
+
 // PickFiles opens a native multi-file chooser for prompt attachments
 // (empty when cancelled).
 func (a *App) PickFiles() ([]string, error) {

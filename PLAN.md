@@ -563,7 +563,7 @@ in a compiling state**.
   the GUI harness: bubble, pickers, circular run button, and header
   toggle all render in the light theme.
 
-- [ ] **Step 31 — Orphaned-artifact cleanup.** Deleting a conversation
+- [x] **Step 31 — Orphaned-artifact cleanup.** Deleting a conversation
   deliberately keeps its artifacts (Step 15); this is the deferred
   cleanup. `Library.Orphans(ctx, exists func(convID) bool)` lists
   records whose non-empty ConversationID no longer resolves (empty =

@@ -835,6 +835,14 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("attach").oncontextmenu = (e) => { e.preventDefault(); attachPaths(true); };
   $("prompt").addEventListener("input", growPrompt);
   $("theme-toggle").onclick = toggleTheme;
+  $("gc-artifacts").onclick = async () => {
+    try {
+      const n = await api().GCArtifacts(true);
+      toast(`${n} orphaned artifact(s) removed`);
+    } catch (err) {
+      toast(String(err));
+    }
+  };
   $("composer").onsubmit = runTurn;
   $("prompt").addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
