@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 func ctxT(t *testing.T) context.Context { t.Helper(); return context.Background() }

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/artifact"
+	"github.com/renesugar/agentchat/internal/artifact"
 )
 
 func newLib(t *testing.T) *artifact.Library {

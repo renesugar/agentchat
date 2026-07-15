@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 func parseFixture(t *testing.T, name, workDir string) ([]adapter.Event, *parseState) {

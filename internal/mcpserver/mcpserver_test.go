@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // post sends one JSON-RPC message with the given bearer token and returns

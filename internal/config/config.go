@@ -40,8 +40,8 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/provider"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/provider"
 )
 
 // Provider is a named way to reach models: a set of environment

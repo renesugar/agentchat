@@ -15,17 +15,17 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/artifact"
-	"github.com/example/agentchat/internal/clients"
-	"github.com/example/agentchat/internal/config"
-	"github.com/example/agentchat/internal/engine"
-	"github.com/example/agentchat/internal/export"
-	"github.com/example/agentchat/internal/mcpserver"
-	"github.com/example/agentchat/internal/provider"
-	"github.com/example/agentchat/internal/theme"
-	"github.com/example/agentchat/internal/transcript"
-	"github.com/example/agentchat/internal/workspace"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/artifact"
+	"github.com/renesugar/agentchat/internal/clients"
+	"github.com/renesugar/agentchat/internal/config"
+	"github.com/renesugar/agentchat/internal/engine"
+	"github.com/renesugar/agentchat/internal/export"
+	"github.com/renesugar/agentchat/internal/mcpserver"
+	"github.com/renesugar/agentchat/internal/provider"
+	"github.com/renesugar/agentchat/internal/theme"
+	"github.com/renesugar/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/workspace"
 )
 
 // App is the Wails binding surface: a thin layer over the headless engine.

@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/example/agentchat/internal/artifact"
-	"github.com/example/agentchat/internal/transcript"
-	"github.com/example/agentchat/internal/workspace"
+	"github.com/renesugar/agentchat/internal/artifact"
+	"github.com/renesugar/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/workspace"
 )
 
 // Import restores a conversation from a bundle written by Bundle.

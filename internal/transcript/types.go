@@ -7,7 +7,7 @@ package transcript
 import (
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // Conversation groups turns. If ProjectPath is set, the conversation is

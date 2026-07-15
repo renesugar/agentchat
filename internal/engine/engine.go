@@ -15,11 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/export"
-	"github.com/example/agentchat/internal/mcpserver"
-	"github.com/example/agentchat/internal/transcript"
-	"github.com/example/agentchat/internal/workspace"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/export"
+	"github.com/renesugar/agentchat/internal/mcpserver"
+	"github.com/renesugar/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/workspace"
 )
 
 // Engine runs turns.

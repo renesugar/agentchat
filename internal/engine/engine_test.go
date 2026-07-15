@@ -10,12 +10,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/echo"
-	"github.com/example/agentchat/internal/engine"
-	"github.com/example/agentchat/internal/mcpserver"
-	"github.com/example/agentchat/internal/transcript"
-	"github.com/example/agentchat/internal/workspace"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapters/echo"
+	"github.com/renesugar/agentchat/internal/engine"
+	"github.com/renesugar/agentchat/internal/mcpserver"
+	"github.com/renesugar/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/workspace"
 )
 
 // silentAdapter edits the workspace but reports no file changes — like a

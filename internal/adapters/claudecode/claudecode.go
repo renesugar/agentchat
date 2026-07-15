@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // DefaultPermissionMode is used when the request doesn't override it via

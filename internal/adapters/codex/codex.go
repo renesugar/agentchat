@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // DefaultSandbox is the sandbox mode used unless overridden via

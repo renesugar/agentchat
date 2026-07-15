@@ -37,7 +37,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // Kind classifies a workspace.

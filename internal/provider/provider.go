@@ -24,7 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // Def is one provider definition. The zero Name means the client default

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/echo"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapters/echo"
 )
 
 func TestRegistry(t *testing.T) {

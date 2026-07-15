@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/clients"
-	"github.com/example/agentchat/internal/config"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/clients"
+	"github.com/renesugar/agentchat/internal/config"
 )
 
 const sample = `{

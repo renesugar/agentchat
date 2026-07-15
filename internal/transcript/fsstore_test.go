@@ -9,10 +9,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/echo"
-	"github.com/example/agentchat/internal/engine"
-	"github.com/example/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapters/echo"
+	"github.com/renesugar/agentchat/internal/engine"
+	"github.com/renesugar/agentchat/internal/transcript"
 )
 
 func newStore(t *testing.T) *transcript.FSStore {

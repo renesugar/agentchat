@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // ErrNotFound is returned when a conversation or turn does not exist.

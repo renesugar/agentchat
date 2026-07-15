@@ -21,7 +21,7 @@ You are implementing AgentChat according to `PLAN.md`. Rules:
 6. **Stdlib-only until a step explicitly introduces a dependency.** When one
    does, pin it in `go.mod` and note why in `ARCHITECTURE.md`.
 7. **Don't rename the module or packages** without updating all references;
-   module path is `github.com/example/agentchat` (rename once a real home
+   module path is `github.com/renesugar/agentchat` (rename once a real home
    exists — a single `go.mod` edit + goimports).
 8. If reality disagrees with the plan (a CLI flag changed, an approach is
    wrong), fix the plan in the same commit and say so in the commit message.

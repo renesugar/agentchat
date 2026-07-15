@@ -21,10 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/artifact"
-	"github.com/example/agentchat/internal/transcript"
-	"github.com/example/agentchat/internal/workspace"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/artifact"
+	"github.com/renesugar/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/workspace"
 )
 
 // Exporter renders conversations. Library is optional (no artifacts

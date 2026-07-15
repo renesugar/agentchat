@@ -1,9 +1,9 @@
-module github.com/example/agentchat/app
+module github.com/renesugar/agentchat/app
 
 go 1.25.0
 
 require (
-	github.com/example/agentchat v0.0.0
+	github.com/renesugar/agentchat v0.0.0
 	github.com/wailsapp/wails/v2 v2.13.0
 )
 
@@ -38,4 +38,4 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 )
 
-replace github.com/example/agentchat => ../
+replace github.com/renesugar/agentchat => ../

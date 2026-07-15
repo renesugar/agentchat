@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/agentchat/internal/adapter"
-	"github.com/example/agentchat/internal/adapters/aider"
-	"github.com/example/agentchat/internal/adapters/claudecode"
-	"github.com/example/agentchat/internal/adapters/codex"
-	"github.com/example/agentchat/internal/adapters/echo"
-	"github.com/example/agentchat/internal/adapters/swival"
-	"github.com/example/agentchat/internal/config"
-	"github.com/example/agentchat/internal/provider"
+	"github.com/renesugar/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapters/aider"
+	"github.com/renesugar/agentchat/internal/adapters/claudecode"
+	"github.com/renesugar/agentchat/internal/adapters/codex"
+	"github.com/renesugar/agentchat/internal/adapters/echo"
+	"github.com/renesugar/agentchat/internal/adapters/swival"
+	"github.com/renesugar/agentchat/internal/config"
+	"github.com/renesugar/agentchat/internal/provider"
 )
 
 // Set couples the registry with the configuration that shapes turns.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/agentchat/internal/adapter"
+	"github.com/renesugar/agentchat/internal/adapter"
 )
 
 // streamLine is the superset of fields we care about across Claude Code

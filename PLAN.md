@@ -601,7 +601,7 @@ in a compiling state**.
      (sk-or-/sk-ant-/token patterns) and stray local files — initial
      scan clean; re-run as the last gate before push.
   2. Rename the module to its real home per AGENTS.md rule 7:
-     `github.com/example/agentchat` → `github.com/renesugar/agentchat`
+     `github.com/renesugar/agentchat` → `github.com/renesugar/agentchat`
      in root go.mod, app/go.mod (+ replace), and every import; update
      AGENTS.md rule 7 itself; `make check` + `make app-build-check`.
   3. LICENSE: none exists — publishing without one means all rights

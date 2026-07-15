@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/example/agentchat/internal/transcript"
+	"github.com/renesugar/agentchat/internal/transcript"
 )
 
 func TestProjects(t *testing.T) {
