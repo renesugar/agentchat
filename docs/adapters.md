@@ -6,6 +6,21 @@ live in `<data>/config.json` — see `docs/config.example.json` and
 OPENAI_API_KEY); swival → `extra: {provider: generic, base_url: ...}`;
 claude/codex → their own env/config conventions.
 
+Client config isolation (Step 18, audited 2026-07-14): AgentChat NEVER
+writes any client's configuration — not ~/.claude*/settings files, not
+~/.codex/* (read-only parse only), not .aider.conf.yml/.env, not
+~/.config/swival. Everything per-turn travels as flags, per-invocation
+`-c` overrides, stdin, process environment, or temp files (aider's
+--read context file, swival's --report — both in os.TempDir, cleaned
+after the run). Write-site audit result: all writes land in the
+AgentChat data dir, managed workspaces, os.TempDir, or user-chosen
+dialog/export/promote targets; git identity is passed per-invocation
+(-c user.name=...), never written to any gitconfig. Files clients
+create THEMSELVES in the workspace (.aider.chat.history.md, .swival/
+state) are per-workspace runtime state, not configuration. Guarded by
+stub-binary tests that point HOME at an empty temp dir and assert it
+stays empty after a turn.
+
 Context bootstrap (Step 26): when the MCP/REST callback channel is on,
 the engine appends a system-prompt fragment telling the client how to
 fetch the conversation transcript (get_turns tool / GET /context) and

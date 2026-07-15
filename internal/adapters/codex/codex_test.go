@@ -234,6 +234,15 @@ func TestRunTurnWithStubBinary(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("stub script requires a POSIX shell")
 	}
+	// Step 18 guard: a turn must never create client config under HOME.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	defer func() {
+		if entries, err := os.ReadDir(home); err == nil && len(entries) != 0 {
+			t.Errorf("turn wrote into HOME: %v", entries)
+		}
+	}()
+
 	fixture, err := filepath.Abs(filepath.Join("testdata", "simple_session.jsonl"))
 	if err != nil {
 		t.Fatal(err)

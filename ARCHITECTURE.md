@@ -124,6 +124,15 @@ point of the app.
     is used by shelling out (no cgo/go-git). Wails and any DB driver enter
     only at their steps, isolated from `internal/`.
 
+11. **Client config isolation.** AgentChat never writes (or causes
+    clients to write) user configuration: no ~/.claude*, ~/.codex/*
+    (read-only provider parse only), .aider.conf.yml, or swival
+    config. Per-turn settings travel exclusively via argv flags,
+    per-invocation config overrides, stdin, process env, and temp
+    files; all app writes stay inside the data dir, managed
+    workspaces, os.TempDir, and user-chosen dialog targets. Enforced
+    by audit (docs/adapters.md) and HOME-isolation tests.
+
 ## Package map
 
 ```
