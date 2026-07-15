@@ -594,7 +594,7 @@ in a compiling state**.
   Credential Manager UI, then a provider turn; record versions in
   docs/adapters.md and flip this to [x].
 
-- [ ] **Step 33 — Publish to GitHub (github.com/renesugar/agentchat).**
+- [x] **Step 33 — Publish to GitHub (github.com/renesugar/agentchat).**
   The repo exists (public, empty) and `origin` is already configured;
   gh is authenticated. In order:
   1. Pre-publish secret audit: scan the full history for key material
