@@ -15,6 +15,7 @@ const state = {
   liveTurnEl: null,   // element receiving streamed events
   collapsed: {},      // project path -> true (persisted via UIState)
   theme: "",          // selected theme name (persisted via UIState)
+  attachments: [],    // file/dir paths referenced by the next prompt
 };
 
 /* ---------- helpers ---------- */
@@ -251,6 +252,65 @@ async function applyTheme(name) {
   }
 }
 
+function updateThemeToggle() {
+  $("theme-toggle").textContent = state.theme === "agentchat-light" ? "🌙" : "☀";
+}
+
+// toggleTheme flips between the built-in pair; the Settings select
+// still offers every theme (incl. user ones).
+async function toggleTheme() {
+  const next = state.theme === "agentchat-light" ? "agentchat-dark" : "agentchat-light";
+  await applyTheme(next);
+  saveUIState();
+  updateThemeToggle();
+  const sel = $("theme");
+  if ([...sel.options].some((o) => o.value === next)) sel.value = next;
+}
+
+/* ---------- prompt attachments & autogrow ---------- */
+
+function renderChips() {
+  const box = $("attach-chips");
+  box.replaceChildren();
+  box.hidden = state.attachments.length === 0;
+  for (const p of state.attachments) {
+    const chip = el("span", "chip");
+    const label = el("span", "", p.split("/").pop() || p);
+    label.title = p;
+    const x = el("button", "", "×");
+    x.type = "button";
+    x.title = `Remove ${p}`;
+    x.onclick = () => {
+      state.attachments = state.attachments.filter((q) => q !== p);
+      renderChips();
+    };
+    chip.append(label, x);
+    box.append(chip);
+  }
+}
+
+async function attachPaths(dir) {
+  try {
+    const picked = dir
+      ? [await api().PickRepoDirectory()].filter(Boolean)
+      : (await api().PickFiles()) || [];
+    for (const p of picked) {
+      if (p && !state.attachments.includes(p)) state.attachments.push(p);
+    }
+    renderChips();
+  } catch (err) {
+    toast(String(err));
+  }
+}
+
+// growPrompt sizes the textarea to its content up to the CSS cap, after
+// which it scrolls internally.
+function growPrompt() {
+  const ta = $("prompt");
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
+}
+
 async function loadThemes() {
   const sel = $("theme");
   sel.replaceChildren();
@@ -463,8 +523,12 @@ async function openConversation(conv) {
 async function runTurn(evSubmit) {
   evSubmit.preventDefault();
   if (state.running || !state.current) return;
-  const prompt = $("prompt").value.trim();
+  let prompt = $("prompt").value.trim();
   if (!prompt) return;
+  if (state.attachments.length) {
+    prompt += "\n\nReferenced files/directories:\n" +
+      state.attachments.map((p) => "- " + p).join("\n");
+  }
 
   const client = $("client").value;
   const providerName = $("provider").value;
@@ -475,6 +539,9 @@ async function runTurn(evSubmit) {
   state.running = true;
   $("run").disabled = true;
   $("prompt").value = "";
+  state.attachments = [];
+  renderChips();
+  growPrompt();
 
   // Optimistic turn block that live events stream into.
   const transcript = $("transcript");
@@ -764,6 +831,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   $("client").onchange = refreshProviders;
   $("provider").onchange = refreshModels;
+  $("attach").onclick = () => attachPaths(false);
+  $("attach").oncontextmenu = (e) => { e.preventDefault(); attachPaths(true); };
+  $("prompt").addEventListener("input", growPrompt);
+  $("theme-toggle").onclick = toggleTheme;
   $("composer").onsubmit = runTurn;
   $("prompt").addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -800,6 +871,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   await loadThemes();
+  updateThemeToggle();
   await loadAdapters();
   await loadConversations();
 });

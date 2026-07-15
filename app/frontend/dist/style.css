@@ -318,33 +318,76 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 /* ---------- composer ---------- */
 
-#composer {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "picker picker" "prompt run";
-  gap: 8px;
-  padding: 12px 20px 16px;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
+/* One rounded input bubble: prompt on top (grows, then scrolls),
+   attach + pickers + circular run button on the bottom row inside. */
+#composer { padding: 10px 20px 14px; border-top: 1px solid var(--line); background: var(--panel); }
+#input-bubble {
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--ink);
+  padding: 10px 12px 8px;
 }
-#composer .picker { grid-area: picker; display: flex; gap: 8px; }
+#input-bubble:focus-within { border-color: var(--focus); }
+#attach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+#attach-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 300px;
+  padding: 2px 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font: 11.5px var(--mono);
+  color: var(--muted);
+}
+#attach-chips .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#attach-chips .chip button {
+  border: 0; background: none; padding: 0;
+  color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1;
+}
+#attach-chips .chip button:hover { color: var(--danger); }
+#composer textarea {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  resize: none;
+  padding: 2px 2px 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+#composer .controls { display: flex; align-items: center; gap: 8px; }
 #composer select {
   background: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 5px 8px;
-  font: 12.5px var(--mono);
-}
-#composer textarea {
-  grid-area: prompt;
-  background: var(--ink);
-  border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 9px 12px;
-  resize: vertical;
-  min-height: 60px;
+  padding: 4px 8px;
+  font: 12px var(--mono);
+  min-width: 0;
 }
-#run { grid-area: run; align-self: end; padding: 9px 16px; }
+#attach {
+  flex: none;
+  width: 30px; height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  font: 18px/1 var(--body);
+  color: var(--muted);
+}
+#attach:hover { color: var(--text); }
+#run {
+  flex: none;
+  margin-left: auto;
+  width: 34px; height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: var(--focus);
+  color: var(--ink);
+  font: 700 17px/1 var(--body);
+}
+#run:hover { filter: brightness(1.1); }
 
 /* ---------- dialogs (Settings, About) ---------- */
 

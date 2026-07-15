@@ -47,6 +47,7 @@
             <p id="conv-meta"></p>
           </div>
           <div class="actions">
+            <button id="theme-toggle" class="ghost" title="Toggle light/dark theme">☀</button>
             <button id="make-project" class="ghost" title="Move this scratch workspace to a new directory and make it a project">Make project…</button>
             <button id="move-conv" class="ghost" title="Re-associate this conversation with a project">Move…</button>
           </div>
@@ -72,15 +73,19 @@
         </div>
 
         <form id="composer">
-          <div class="picker">
-            <select id="client" aria-label="Coding client"></select>
-            <select id="provider" aria-label="Model provider" title="Model provider (subscription/default when unset)"></select>
-            <select id="model" aria-label="Model"></select>
-            <select id="effort" aria-label="Reasoning effort" title="Reasoning effort (per client; validated by the client)"></select>
+          <div id="input-bubble">
+            <div id="attach-chips" hidden></div>
+            <textarea id="prompt" rows="2"
+              placeholder="Describe the next turn's task… (Ctrl+Enter to run)"></textarea>
+            <div class="controls">
+              <button type="button" id="attach" title="Attach files to the prompt (right-click for a directory)">+</button>
+              <select id="client" aria-label="Coding client" title="Coding client"></select>
+              <select id="provider" aria-label="Model provider" title="Model provider (subscription/default when unset)"></select>
+              <select id="model" aria-label="Model" title="Model"></select>
+              <select id="effort" aria-label="Reasoning effort" title="Reasoning effort (per client; validated by the client)"></select>
+              <button id="run" type="submit" title="Run turn (Ctrl+Enter)">↑</button>
+            </div>
           </div>
-          <textarea id="prompt" rows="3"
-            placeholder="Describe the next turn's task… (Ctrl+Enter to run)"></textarea>
-          <button id="run" type="submit">Run turn</button>
         </form>
       </section>
     </main>

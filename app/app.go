@@ -443,6 +443,14 @@ func (a *App) ImportBundle() (*transcript.Conversation, error) {
 	return conv, nil
 }
 
+// PickFiles opens a native multi-file chooser for prompt attachments
+// (empty when cancelled).
+func (a *App) PickFiles() ([]string, error) {
+	return runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Attach files to the prompt",
+	})
+}
+
 // PickRepoDirectory opens a native directory chooser and returns the
 // selected path ("" if cancelled).
 func (a *App) PickRepoDirectory() (string, error) {
