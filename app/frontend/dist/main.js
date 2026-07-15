@@ -779,6 +779,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("close-artifacts").onclick = () => { $("artifact-panel").hidden = true; };
   $("attach-file").onclick = attachFile;
 
+  // Escape must close a modal <dialog> even while a child control
+  // (e.g. the theme select) holds focus — webkit only fires the
+  // dialog's native cancel when the dialog itself is focused.
+  for (const id of ["settings-dialog", "about-dialog"]) {
+    $(id).addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); $(id).close(); }
+    });
+  }
+
   window.runtime.EventsOn("turn-event", onTurnEvent);
   window.runtime.EventsOn("menu", onMenu);
 

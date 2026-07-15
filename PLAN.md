@@ -433,147 +433,26 @@ in a compiling state**.
   desktop: Escape didn't close the Settings <dialog> while the theme
   select had focus.
 
-- [ ] **Step 24 — GUI popup verification under a real WM (openbox +
-  xcompmgr are now installed).** Finish the visual checks Step 23
-  could not do: GTK popup surfaces rendered solid black under bare
-  Xvfb because there was no window manager or compositor.
-  - Harness (extends the Step 23 recipe): start `Xvfb :99 -screen 0
-    1400x900x24 &`, then `DISPLAY=:99 openbox &` and `DISPLAY=:99
-    xcompmgr &` BEFORE launching the app; everything else (xdotool,
-    xwd → ffmpeg → PNG, xclip, ≥3s waits) unchanged.
-  - Verify: (a) select dropdown OPTION lists are legible in BOTH
-    themes (agentchat-dark and agentchat-light) — this was the user's
-    original complaint; (b) per-client effort dropdown contents change
-    when switching client (aider: low/medium/high; claude adds
-    xhigh/max; codex starts at minimal; swival has none…default);
-    (c) File/View/Help menu CONTENTS and accelerator labels;
-    (d) the Escape-in-Settings quirk (Escape while the theme select
-    has focus did not close the <dialog> — decide whether it's webkit
-    popup-consumes-Escape behavior or a bug worth a keydown handler).
-  - Fix anything found; screenshot evidence per finding.
-
-- [x] **Step 25 — Conversation context over MCP/REST.** The app owns the
-  transcript, per-turn records, and artifacts; coding clients can now
-  pull them mid-turn. `internal/mcpserver` gains the `get_turns` tool
-  (optional `last_n`; omit/0 = full transcript) returning markdown —
-  header "(n of m turns)" + per-turn sections rendered with
-  export.TurnMarkdown so mid-turn context matches exports byte-for-byte;
-  the in-flight turn appears with whatever events have streamed so far.
-  REST twin `GET /context[?last_n=N]` on the same loopback listener and
-  turn-scoped bearer token (text/markdown; 400 bad last_n, 401 bad
-  token, 404 when no context source) for clients without MCP support.
-  Wiring: `Sink.Context func(lastN int)`; the engine supplies it via
-  renderContext (Store reads + TurnMarkdown) under the emit mutex so
-  reads never race event appends from HTTP goroutines. Tests: tool +
-  REST auth/trim/validation matrix in mcpserver; engine round trip
-  where the fake client fetches full and last_n=1 context during turn 2
-  over both MCP and REST and sees turn 1's content exactly when it
-  should.
-
-- [x] **Step 26 — Context bootstrap system prompt per client.**
-  `TurnRequest.SystemPrompt` (extra system text, never replacing the
-  client's own); the engine appends a per-turn fragment describing the
-  get_turns tool, the GET /context REST endpoint (concrete URL), and
-  the AGENTCHAT_MCP_TOKEN env var — the token itself never appears in
-  prompt text or argv, and every adapter now injects it via the shared
-  adapter.MCPEnv (codex's private helper generalized). Delivery, each
-  VERIFIED against the installed binary: claude 2.1.206
-  `--append-system-prompt` (✅ live: model quoted /context + env var
-  back); codex 0.142.5 `-c developer_instructions=` with a proper
-  tomlQuote (Go %q emits \xNN escapes TOML rejects; both `instructions`
-  and `developer_instructions` pass --strict-config, the latter ✅
-  live-verified via marker-instruction probe on gpt-5.4-mini); swival
-  1.0.25 `--system-prompt`; aider 0.86.2 has NO system-prompt flag
-  (`--system-prompt-extras` does not exist in this version — external
-  docs wrong) → fragment travels as a temp file via `--read`, created
-  and cleaned by RunTurn outside the workspace so snapshots never see
-  it. Extra["context_bootstrap"]="false" suppresses the fragment.
-  Tests: buildArgs per adapter, tomlQuote table, MCPEnv, engine round
-  trip asserting fragment contents + no token leak + suppression.
-
-- [x] **Step 27 — Provider model (core) + platform secrets.**
-  `internal/provider` (stdlib-only): `Def` (Name "" = client default,
-  mirroring model ID ""), `Default(client)` builtin entry (claude/codex
-  "Subscription (default)" — injects nothing; others "Default
-  (inherited environment)"), `Catalog(client, configDefs, codexDefs)` —
-  builtin first; for codex only codex-declared providers are usable,
-  with same-named config.json entries overlaid (key secrets, models,
-  labels) and config-only names dropped; other clients get config defs
-  as-is. `ReadCodexConfig` parses ~/.codex/config.toml READ-ONLY with a
-  minimal line-based TOML-subset reader (tables, basic/literal strings,
-  escapes; multiline strings consumed, arrays/inline tables skipped —
-  no dependency added; codex validates its own config) extracting
-  model_providers.* name/base_url/env_key plus top-level
-  model_provider/model; $CODEX_HOME honored; verified against the real
-  ~/.codex/config.toml (openai / gpt-5.6-sol, 0 custom providers).
-  Secrets: config providers gain label/base_url/api_key_env/
-  api_key_secret/clients/models (api_key_secret without api_key_env is
-  a loud config error); `Def.ResolveEnv(ctx, store)` returns sorted
-  ${VAR}-expanded env plus EnvKey=<secret> fetched per turn through the
-  SecretStore interface — PlatformStore() is secret-tool on Linux
-  (attrs sorted deterministically; missing tool/entry/empty = loud
-  error; value only ever in the pipe, never argv/disk), a
-  clearly-labeled unsupported stub elsewhere. secret-tool + the
-  keyring's openrouter entry verified present on this machine (length
-  only). Config.ProviderDefs(client) honors per-provider client
-  restrictions. Tests: catalog merge/drop rules, ResolveEnv matrix,
-  real exec path via stub secret-tool on PATH, codex TOML fixture
-  (quoted table keys, comments, multiline, inline tables), value
-  parser table, config field parsing/validation. Supersedes Step 22.
-  Adapter/engine wiring is Step 28; pickers Step 29.
-
-- [x] **Step 28 — Adapter provider wiring.** `TurnRequest.Provider
-  *ProviderInfo` (callers set Name; `Set.Prepare` — now ctx-aware and
-  error-returning — resolves it via the Step 27 catalog: fills
-  BaseURL/Subscription, appends the provider's env with the API key
-  fetched from the platform secret store; unknown names error listing
-  what exists; nil/"" = client default, resolves nothing). Adapter
-  mapping: claude → providerEnv injects ANTHROPIC_BASE_URL unless the
-  env map already sets it (key/AUTH_TOKEN nuances live in config env
-  maps); codex → `-c model_provider="<name>"` per invocation
-  (subscription omits; ✅ live-verified the override is honored via a
-  bogus-name probe); aider → env only; swival → native names to
-  `--provider`, non-native+base_url to `--provider generic
-  --base-url`, Extra keys winning for back-compat. CLI: `-provider`
-  flag; `-list` now shows each client's provider catalog. App.Run
-  passes no provider until the Step 29 pickers. ✅ Live end to end
-  with the real keyring: secret-tool → OPENROUTER_API_KEY → aider →
-  OpenRouter authenticated (free models upstream-rate-limited; 429
-  with account identity proves the auth path; bad keys 401). Tests:
-  Prepare resolution matrix (secret injection/failure, unknown names,
-  client restrictions, codex catalog from a config.toml fixture),
-  providerEnv, codex/swival buildArgs incl. precedence rules.
-
-- [x] **Step 29 — Cascading pickers: Provider → Model → Effort.**
-  `Set.ProvidersWithModels` fills each catalog entry's model list (a
-  provider's own models get a leading client-default entry; providers
-  without models fall back to the client's merged list) so
-  AdapterInfo.Providers carries the whole tree and the frontend
-  cascades client → provider → model → effort with no round trips.
-  Composer gains the Provider select (labels; "" = subscription/
-  default); client change repopulates providers, provider change
-  repopulates models, picks survive when still offered. App.Run gains
-  the provider param; the selected provider is recorded on the turn
-  (transcript.Turn.Provider, mirroring effort) and shown as "via
-  <name>" in the GUI turn header, optimistic header, and TurnMarkdown
-  ("client (model, effort X, via Y)" — golden updated). Tests:
-  ProvidersWithModels fallback/prepend rules, engine provider
-  persistence. GUI verified via the harness under openbox+xcompmgr:
-  four-select composer renders and focuses; dropdown POPUP contents
-  remain the Step 24 item.
-
-- [ ] **Step 30 — Composer redesign (per agentchat_lighttheme_new.png).**
-  One rounded input bubble containing: the prompt textarea (grows to a
-  cap, then scrolls internally), a bottom control row with [+] attach
-  (native file/dir chooser; chosen paths render as removable reference
-  chips inside the bubble and are appended to the prompt as
-  workspace-relative references), the Coding Client / Provider /
-  Model / Model Effort selects (Step 29), and a circular ↑ run button.
-  Light/dark theme toggle moves into the conversation header (sun/moon
-  switch per the mock) alongside Make project…/Move…. Keep the
-  Settings-dialog theme select for full theme choice; the toggle flips
-  between the built-in pair. Verify with the GUI harness in both
-  themes.
+- [x] **Step 24 — GUI popup verification under openbox + xcompmgr.**
+  Harness now runs Xvfb + openbox + xcompmgr before the app; findings:
+  (a) select dropdown popups are NATIVE GTK panels — they render
+  dark-text-on-light in BOTH themes and are fully legible (the original
+  invisible-text complaint is resolved: page CSS fixed the closed
+  control in Step 21, and native popups use system colors, unaffected
+  by page CSS); screenshots taken in dark and light themes.
+  (b) cascade verified visually: switching aider → claude flipped the
+  provider select to "Subscription (default)" and the effort popup to
+  claude's low/medium/high/xhigh/max list.
+  (c) menubar: accelerators and actions fire (Ctrl+comma, Ctrl+L —
+  verified here and in Step 23), but the dropdown PANEL never maps
+  under synthetic xdotool input (click, Alt+F, press-and-hold) even
+  with WM+compositor — GTK menu pointer-grab vs. synthetic events;
+  recorded as a HARNESS limitation, verify menu contents by eye on a
+  real desktop.
+  (d) Escape-in-Settings quirk REPRODUCED (webkit fires the dialog's
+  native cancel only when the dialog itself has focus) and FIXED: a
+  keydown handler on both dialogs closes on Escape regardless of the
+  focused child; re-verified in the exact focused-select scenario.
 
 ## Notes for the next implementing agent (handoff, 2026-07-11)
 
