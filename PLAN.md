@@ -563,6 +563,36 @@ in a compiling state**.
   the GUI harness: bubble, pickers, circular run button, and header
   toggle all render in the light theme.
 
+- [ ] **Step 31 — Orphaned-artifact cleanup.** Deleting a conversation
+  deliberately keeps its artifacts (Step 15); this is the deferred
+  cleanup. `Library.Orphans(ctx, exists func(convID) bool)` lists
+  records whose non-empty ConversationID no longer resolves (empty =
+  global, never an orphan); deletion reuses Library.Delete so CAS
+  blobs GC when their last record goes. CLI `-gc-artifacts <list|
+  delete>` (list = dry run); App binding `GCArtifacts(remove bool)`
+  returning the count; a Maintenance button in the Settings dialog
+  (removes + toasts the count). Tests: orphan detection matrix
+  (missing conv, live conv, global) and delete-with-blob-GC.
+
+- [ ] **Step 32 — macOS/Windows secret-store backends.** Extend
+  provider.PlatformStore beyond Linux/secret-tool:
+  - darwin: `security find-generic-password -w` mapping attrs — use
+    reserved attribute names service/account from api_key_secret
+    (e.g. {"service":"openrouter","account":"api_key"}); other attr
+    keys are an error explaining the darwin mapping. Value read from
+    stdout, never argv.
+  - windows: Credential Manager. No good built-in CLI for reads;
+    prefer a tiny wincred syscall wrapper (x/sys/windows dependency —
+    record the decision in ARCHITECTURE.md decision 10) over
+    PowerShell scraping; attrs {"target":"..."}.
+  - Shared: keep the SecretStore interface; per-OS attr validation
+    with actionable errors; docs/config.example.json gains per-OS
+    recipes. MUST be verified on real macOS/Windows machines before
+    the step is marked done — build-tagged code plus stubbed-tool
+    tests (darwin path testable on Linux by pointing execStore at a
+    fake `security` on PATH) are not sufficient on their own; record
+    verification status in docs/adapters.md.
+
 ## Notes for the next implementing agent (handoff, 2026-07-11)
 
 State: steps 1-17 and 19-21, 23 are done and committed on main; `make
