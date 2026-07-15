@@ -162,15 +162,124 @@ func (d Def) ResolveEnv(ctx context.Context, store SecretStore) ([]string, error
 	return env, nil
 }
 
-// PlatformStore returns the secret store for the current OS. Linux uses
-// secret-tool (libsecret / GNOME Keyring); other platforms return a
-// store whose lookups explain what is missing (macOS `security` and
-// Windows credential-manager backends are future work).
+// PlatformStore returns the secret store for the current OS: Linux
+// secret-tool (libsecret/GNOME Keyring), macOS the `security` Keychain
+// CLI, Windows Credential Manager via PowerShell. All are exec-based —
+// the secret value exists only in the child's stdout pipe, never argv.
+//
+// ⚠ Step 32 status: the darwin and windows backends are stub-tested but
+// NOT yet verified on real macOS/Windows machines (see PLAN.md).
 func PlatformStore() SecretStore {
-	if runtime.GOOS == "linux" {
+	switch runtime.GOOS {
+	case "linux":
 		return execStore{tool: "secret-tool"}
+	case "darwin":
+		return darwinStore{tool: "security"}
+	case "windows":
+		return windowsStore{tool: "powershell"}
+	default:
+		return unsupportedStore{goos: runtime.GOOS}
 	}
-	return unsupportedStore{goos: runtime.GOOS}
+}
+
+// darwinStore reads macOS Keychain generic passwords via the `security`
+// CLI. api_key_secret uses the reserved attribute names "service"
+// (required) and "account" (optional):
+//
+//	security find-generic-password -s <service> [-a <account>] -w
+type darwinStore struct{ tool string }
+
+func (s darwinStore) Lookup(ctx context.Context, attrs map[string]string) (string, error) {
+	service := attrs["service"]
+	if service == "" {
+		return "", errors.New(`macOS keychain lookup needs {"service": "<name>"} (plus optional "account") in api_key_secret`)
+	}
+	for k := range attrs {
+		if k != "service" && k != "account" {
+			return "", fmt.Errorf("macOS keychain lookup: unknown attribute %q (only service/account map to `security find-generic-password`)", k)
+		}
+	}
+	if _, err := exec.LookPath(s.tool); err != nil {
+		return "", fmt.Errorf("%s not found on PATH: %w", s.tool, err)
+	}
+	args := []string{"find-generic-password", "-s", service}
+	if a := attrs["account"]; a != "" {
+		args = append(args, "-a", a)
+	}
+	args = append(args, "-w") // print only the password, to stdout
+	cmd := exec.CommandContext(ctx, s.tool, args...)
+	var out, errBuf strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%s find-generic-password -s %s failed: %w (%s)",
+			s.tool, service, err, strings.TrimSpace(errBuf.String()))
+	}
+	secret := strings.TrimRight(out.String(), "\r\n")
+	if secret == "" {
+		return "", fmt.Errorf("keychain item service=%s returned no secret", service)
+	}
+	return secret, nil
+}
+
+// windowsStore reads Windows Credential Manager generic credentials via
+// PowerShell P/Invoke (CredReadW) — no Go syscall dependency, and the
+// target name travels through the environment, not the command line.
+// api_key_secret uses exactly {"target": "<credential name>"}.
+type windowsStore struct{ tool string }
+
+// winCredScript reads $env:AGENTCHAT_CRED_TARGET and writes the
+// credential blob to stdout.
+const winCredScript = `$sig = @"
+using System;
+using System.Runtime.InteropServices;
+public class AgentChatCred {
+  [DllImport("advapi32", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool CredReadW(string target, int type, int flags, out IntPtr pcred);
+  [DllImport("advapi32")]
+  public static extern void CredFree(IntPtr cred);
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct CREDENTIAL {
+    public int Flags; public int Type; public string TargetName; public string Comment;
+    public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+    public int CredentialBlobSize; public IntPtr CredentialBlob; public int Persist;
+    public int AttributeCount; public IntPtr Attributes; public string TargetAlias; public string UserName;
+  }
+  public static string Get(string target) {
+    IntPtr p;
+    if (!CredReadW(target, 1, 0, out p)) { throw new Exception("credential not found: " + target); }
+    var c = (CREDENTIAL)Marshal.PtrToStructure(p, typeof(CREDENTIAL));
+    var s = Marshal.PtrToStringUni(c.CredentialBlob, c.CredentialBlobSize / 2);
+    CredFree(p);
+    return s;
+  }
+}
+"@
+Add-Type -TypeDefinition $sig
+[Console]::Out.Write([AgentChatCred]::Get($env:AGENTCHAT_CRED_TARGET))`
+
+func (s windowsStore) Lookup(ctx context.Context, attrs map[string]string) (string, error) {
+	target := attrs["target"]
+	if target == "" || len(attrs) != 1 {
+		return "", errors.New(`windows credential lookup takes exactly {"target": "<credential name>"} in api_key_secret`)
+	}
+	if _, err := exec.LookPath(s.tool); err != nil {
+		return "", fmt.Errorf("%s not found on PATH: %w", s.tool, err)
+	}
+	cmd := exec.CommandContext(ctx, s.tool, "-NoProfile", "-NonInteractive", "-Command", winCredScript)
+	cmd.Env = append(os.Environ(), "AGENTCHAT_CRED_TARGET="+target)
+	var out, errBuf strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("credential manager lookup for %q failed: %w (%s)",
+			target, err, strings.TrimSpace(errBuf.String()))
+	}
+	secret := strings.TrimRight(out.String(), "\r\n")
+	if secret == "" {
+		return "", fmt.Errorf("credential %q returned no secret", target)
+	}
+	return secret, nil
 }
 
 // execStore shells out to secret-tool. The secret value exists only in

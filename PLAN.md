@@ -574,24 +574,25 @@ in a compiling state**.
   (removes + toasts the count). Tests: orphan detection matrix
   (missing conv, live conv, global) and delete-with-blob-GC.
 
-- [ ] **Step 32 — macOS/Windows secret-store backends.** Extend
-  provider.PlatformStore beyond Linux/secret-tool:
-  - darwin: `security find-generic-password -w` mapping attrs — use
-    reserved attribute names service/account from api_key_secret
-    (e.g. {"service":"openrouter","account":"api_key"}); other attr
-    keys are an error explaining the darwin mapping. Value read from
-    stdout, never argv.
-  - windows: Credential Manager. No good built-in CLI for reads;
-    prefer a tiny wincred syscall wrapper (x/sys/windows dependency —
-    record the decision in ARCHITECTURE.md decision 10) over
-    PowerShell scraping; attrs {"target":"..."}.
-  - Shared: keep the SecretStore interface; per-OS attr validation
-    with actionable errors; docs/config.example.json gains per-OS
-    recipes. MUST be verified on real macOS/Windows machines before
-    the step is marked done — build-tagged code plus stubbed-tool
-    tests (darwin path testable on Linux by pointing execStore at a
-    fake `security` on PATH) are not sufficient on their own; record
-    verification status in docs/adapters.md.
+- [~] **Step 32 — macOS/Windows secret-store backends.** IMPLEMENTED,
+  NOT YET VERIFIED ON REAL HARDWARE — that verification is the only
+  thing left before [x]. Both backends are pure exec code (no build
+  tags, no new dependency), selected by PlatformStore per GOOS:
+  darwin → `security find-generic-password -s <service> [-a <account>]
+  -w` with reserved api_key_secret attrs service (required) / account
+  (optional); other attr keys error with the mapping explained.
+  windows → Credential Manager via PowerShell P/Invoke of CredReadW
+  (chosen over an x/sys dependency to keep the root module stdlib-only;
+  over cmdkey, which cannot read secrets): api_key_secret takes exactly
+  {"target": "<name>"}, and the target travels via the
+  AGENTCHAT_CRED_TARGET environment variable, never the command line.
+  Values in both cases exist only in the child's stdout pipe. Stub-tool
+  tests cover arg/env mapping and error paths on any OS; GOOS=darwin/
+  windows cross-compiles pass. TO FINISH: on a real Mac, store a key
+  (`security add-generic-password -s openrouter -a api_key -w`) and run
+  a provider turn; on real Windows, `cmdkey /generic:openrouter ...` or
+  Credential Manager UI, then a provider turn; record versions in
+  docs/adapters.md and flip this to [x].
 
 ## Notes for the next implementing agent (handoff, 2026-07-11)
 

@@ -114,7 +114,10 @@ point of the app.
    config.json entries overlay them (key secrets, models, labels).
    API-key VALUES never live in config files, argv, or transcripts:
    config carries only platform secret-store *lookup attributes*
-   (Linux: secret-tool; other OS backends are future work) and
+   (Linux: secret-tool; macOS: `security` Keychain with service/account
+   attrs; Windows: Credential Manager via PowerShell CredReadW with a
+   "target" attr — both exec-based, no new dependency; real-hardware
+   verification pending, see PLAN step 32) and
    Def.ResolveEnv fetches the value per turn, injecting it as the
    provider's env key. LocalAI or any OpenAI-compatible server is just
    such a provider entry — each client reads its own variables, so env
